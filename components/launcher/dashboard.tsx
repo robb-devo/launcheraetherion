@@ -145,7 +145,6 @@ export function Dashboard() {
             <AccountBadge
               username={activeAccount.username}
               avatarUrl={activeAccount.avatarUrl}
-              type={activeAccount.type}
             />
           ) : (
             <Button asChild variant="outline" className="h-11 border-white/10 bg-background/50 px-5 backdrop-blur-md">
@@ -292,19 +291,14 @@ function IconLink({
 function AccountBadge({
   username,
   avatarUrl,
-  type,
 }: {
   username: string
   avatarUrl?: string
-  type: "offline" | "microsoft"
 }) {
   return (
     <div className="aetherion-glass flex items-center gap-3 rounded-xl px-3 py-2">
       <div className="text-right">
         <p className="text-sm font-medium leading-tight text-foreground">{username}</p>
-        <p className="aetherion-kicker mt-1">
-          {type === "microsoft" ? "Microsoft" : "Offline"}
-        </p>
       </div>
       <Avatar className="size-10 rounded-lg ring-1 ring-primary/40">
         <AvatarImage src={publicAssetPath(avatarUrl || "/placeholder.svg")} alt={username} />

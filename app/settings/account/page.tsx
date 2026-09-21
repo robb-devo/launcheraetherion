@@ -5,7 +5,7 @@ export default function AccountPage() {
   return (
     <SettingsPage
       title="Account settings"
-      description="Add, remove, or select the active account. Microsoft and offline accounts can live together."
+      description="Add a player name, or choose which one is active."
     >
       <AccountTab />
     </SettingsPage>

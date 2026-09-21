@@ -7,7 +7,6 @@ import { AlertCircle, ArrowRight, User, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
 import { addOfflineAccount, validateOfflineUsername } from "@/lib/launcher/accounts"
 import type { AccountsState } from "@/lib/launcher/types"
 import { AetherionMark } from "./aetherion-mark"
@@ -40,7 +39,7 @@ export function LoginForm() {
       }
       router.push("/launcher")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not create the offline account.")
+      setError(readableError(e, "Could not save that name."))
     } finally {
       setBusy(false)
     }
@@ -65,8 +64,8 @@ export function LoginForm() {
               <span className="text-primary">Forge your legend.</span>
             </p>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-foreground/70">
-              Sign in with a local offline name. Microsoft sign-in comes later,
-              with tokens kept only in the system vault.
+              Enter your name, then press play. The launcher prepares the realm
+              and starts the game.
             </p>
           </div>
         </div>
@@ -82,48 +81,15 @@ export function LoginForm() {
         </Link>
 
         <div className="aetherion-rise w-full max-w-sm">
-          <h1 className="font-serif text-3xl tracking-[0.12em] text-foreground">Sign in</h1>
+          <h1 className="font-serif text-3xl tracking-[0.12em] text-foreground">Enter</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your account is saved only on this computer.
+            Your name is saved only on this computer.
           </p>
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              const login = window.aetherion?.accounts?.addMicrosoft?.()
-              if (!login) {
-                setError("Microsoft sign-in will be connected in the Electron process.")
-                return
-              }
-              login
-                .then(() => router.push("/launcher"))
-                .catch((e) =>
-                  setError(
-                    e instanceof Error
-                      ? e.message
-                      : "Microsoft sign-in is not available in this build yet.",
-                  ),
-                )
-            }}
-            className="mt-8 h-11 w-full justify-center gap-3 border-white/10 bg-white/4 hover:bg-white/8"
-          >
-            <MicrosoftLogo />
-            <span className="text-sm font-medium">Continue with Microsoft</span>
-          </Button>
-
-          <div className="flex items-center gap-4 my-6">
-            <Separator className="flex-1 bg-border/60" />
-            <span className="aetherion-kicker">
-              or offline mode
-            </span>
-            <Separator className="flex-1 bg-border/60" />
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <Field>
               <FieldLabel htmlFor="username" className="aetherion-kicker">
-                Username
+                Player name
               </FieldLabel>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -158,7 +124,7 @@ export function LoginForm() {
               disabled={busy}
               className="mt-6 h-11 w-full gap-2 bg-primary font-serif tracking-[0.2em] text-primary-foreground hover:bg-primary/90 aetherion-gold-glow aetherion-sheen"
             >
-              {busy ? "SAVING..." : "SIGN IN"}
+              {busy ? "SAVING..." : "CONTINUE"}
               <ArrowRight className="size-4" />
             </Button>
           </form>
@@ -172,13 +138,7 @@ export function LoginForm() {
   )
 }
 
-function MicrosoftLogo() {
-  return (
-    <svg viewBox="0 0 23 23" className="size-4" aria-hidden>
-      <path fill="#f25022" d="M1 1h10v10H1z" />
-      <path fill="#00a4ef" d="M1 12h10v10H1z" />
-      <path fill="#7fba00" d="M12 1h10v10H12z" />
-      <path fill="#ffb900" d="M12 12h10v10H12z" />
-    </svg>
-  )
+function readableError(error: unknown, fallback: string) {
+  const raw = error instanceof Error ? error.message : fallback
+  return raw.replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "")
 }

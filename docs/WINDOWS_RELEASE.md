@@ -1,20 +1,20 @@
 # Publish the Windows launcher
 
-## Launcher 0.3.3 — visual polish, working offline sign-in
+## Launcher 0.3.4 — visual polish, name then play
 
-This build is the English visual polish. Castle art is a CSS background, the same way the original launcher loaded it. It does not check for launcher updates on startup. Offline sign-in still calls `accounts:addOffline` and stores `accounts.json` under `%APPDATA%\Aetherion Launcher`. The modpack stays `v0.4`. See `docs/DATA_SAFETY.md`.
+This build is the English visual polish. Castle art is a CSS background, the same way the original launcher loaded it. It does not check for launcher updates on startup. Entering a player name still calls `accounts:addOffline` and stores `accounts.json` under `%APPDATA%\Aetherion Launcher`. The login screen no longer offers the unimplemented Microsoft button. The modpack stays `v0.4`. See `docs/DATA_SAFETY.md`.
 
-Players install `Aetherion.Launcher.Setup.0.3.3.exe`. NSIS upgrades the same app id (`gg.aetherion.launcher`) and leaves that AppData folder in place.
+Players install `Aetherion.Launcher.Setup.0.3.4.exe`. NSIS upgrades the same app id (`gg.aetherion.launcher`) and leaves that AppData folder in place.
 
 ### Version
 
 | Where | Value |
 | --- | --- |
-| `package.json` `version` | `0.3.3` |
+| `package.json` `version` | `0.3.4` |
 | Electron `LAUNCHER_VERSION` | read from `package.json` in `electron/main.cjs` |
 | `/download` and settings | `lib/launcher/version.ts` imports `package.json` |
-| NSIS artifact | `Aetherion.Launcher.Setup.0.3.3.exe` |
-| GitHub tag | `v0.3.3` |
+| NSIS artifact | `Aetherion.Launcher.Setup.0.3.4.exe` |
+| GitHub tag | `v0.3.4` |
 | Release repo | `robb-devo/launcheraetherion` |
 
 The tag and `package.json` version must match.
@@ -27,19 +27,19 @@ The tag and `package.json` version must match.
 ```powershell
 git checkout main
 git pull
-git tag v0.3.3
-git push origin v0.3.3
+git tag v0.3.4
+git push origin v0.3.4
 ```
 
 3. Wait for `Build Windows Release`. It runs `pnpm build:win:ci` and uploads:
 
-- `dist/Aetherion.Launcher.Setup.0.3.3.exe`
-- `dist/Aetherion.Launcher.Setup.0.3.3.exe.blockmap`
+- `dist/Aetherion.Launcher.Setup.0.3.4.exe`
+- `dist/Aetherion.Launcher.Setup.0.3.4.exe.blockmap`
 
 4. Confirm:
 
 ```txt
-https://github.com/robb-devo/launcheraetherion/releases/download/v0.3.3/Aetherion.Launcher.Setup.0.3.3.exe
+https://github.com/robb-devo/launcheraetherion/releases/download/v0.3.4/Aetherion.Launcher.Setup.0.3.4.exe
 ```
 
 Do not republish the modpack `v0.4` jars. Modpack files still download from `washryan/launcheraetherion`.
