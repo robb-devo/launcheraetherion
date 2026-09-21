@@ -17,7 +17,7 @@ Compared with `main` (`0.3.0`), these storage decisions are the same functions a
 | Modpack manifest URL | `https://raw.githubusercontent.com/washryan/launcheraetherion/main/public/manifest.json` | unchanged |
 | Server | `left-fcc.gl.joinmc.link` | unchanged |
 
-NSIS stays per-user (`perMachine: false`) with the same app id, so installing `0.3.1` over `0.3.0` replaces the program files and leaves the AppData folder in place. The window background color changed. That is chrome only.
+NSIS stays per-user (`perMachine: false`) with the same app id, so installing `0.3.2` over an older build replaces the program files and leaves the AppData folder in place. The window background color changed. That is chrome only.
 
 `Clear cache` still deletes only:
 
@@ -26,4 +26,4 @@ NSIS stays per-user (`perMachine: false`) with the same app id, so installing `0
 
 It does not delete saves, installed mods, accounts, or `launcher-settings.json`.
 
-The new launcher self-update (`electron/updater.cjs`) downloads the next installer into the updater cache and restarts the app. It does not read or write `accounts.json`, `launcher-settings.json`, or the instance folder. Modpack file updates stay in `runUpdater()` and still match files by SHA-256. The only manifest edit in this release is the English changelog text. File URLs, sizes, and hashes are unchanged.
+This release does not add a launcher self-updater. Modpack file updates stay in `runUpdater()` and still match files by SHA-256. The only manifest edit is the English changelog text. File URLs, sizes, and hashes are unchanged.

@@ -65,32 +65,6 @@ declare global {
           }
         } | null>
       }
-      updater?: {
-        getState: () => Promise<{
-          status: "idle" | "checking" | "available" | "downloading" | "downloaded" | "error"
-          version?: string | null
-          percent?: number | null
-          transferred?: number | null
-          total?: number | null
-          bytesPerSecond?: number | null
-          error?: string | null
-        }>
-        check: () => Promise<{
-          status: string
-        }>
-        install: () => Promise<{ ok: boolean }>
-        onStatus: (
-          cb: (status: {
-            status: "idle" | "checking" | "available" | "downloading" | "downloaded" | "error"
-            version?: string | null
-            percent?: number | null
-            transferred?: number | null
-            total?: number | null
-            bytesPerSecond?: number | null
-            error?: string | null
-          }) => void,
-        ) => () => void
-      }
       launcher: {
         openDataDirectory: () => Promise<{ ok: boolean }>
         openLogsDirectory: () => Promise<{ ok: boolean }>

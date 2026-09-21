@@ -204,26 +204,9 @@ function appIconPath() {
   return fsSync.existsSync(iconPath) ? iconPath : undefined
 }
 
-const { createLauncherUpdater } = require("./updater.cjs")
-let launcherUpdater = null
-
 app.whenReady().then(async () => {
   if (!isDev) registerStaticAppProtocol()
   createWindow()
-  launcherUpdater = createLauncherUpdater({
-    getWindow: () => mainWindow,
-    isDev,
-    shouldDeferRestart: () =>
-      Boolean(activeLaunchAbort) ||
-      Boolean(
-        activeMinecraftProcess &&
-          !activeMinecraftDetached &&
-          !activeMinecraftProcess.killed,
-      ),
-  })
-  launcherUpdater.check(true).catch((error) => {
-    console.warn("[aetherion] update check failed", error)
-  })
 })
 
 app.on("window-all-closed", () => {
@@ -232,12 +215,6 @@ app.on("window-all-closed", () => {
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow()
-})
-
-app.on("browser-window-focus", () => {
-  launcherUpdater?.check(false).catch((error) => {
-    console.warn("[aetherion] update check failed", error)
-  })
 })
 
 app.on("before-quit", () => {
@@ -252,10 +229,6 @@ ipcMain.on("window:maximize", () => {
   else mainWindow?.maximize()
 })
 ipcMain.on("window:close", () => mainWindow?.close())
-
-ipcMain.handle("updater:getState", () => launcherUpdater?.snapshot() ?? { status: "idle" })
-ipcMain.handle("updater:check", () => launcherUpdater?.check(true) ?? { status: "idle" })
-ipcMain.handle("updater:install", () => launcherUpdater?.install() ?? { ok: false })
 
 ipcMain.handle("accounts:list", () => readAccountsState())
 ipcMain.handle("accounts:addOffline", async (_event, username) => {
