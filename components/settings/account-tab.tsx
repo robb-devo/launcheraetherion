@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { AlertCircle, Check, Plus, Trash2, UserPlus, X } from "lucide-react"
+import { AlertCircle, Check, Trash2 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { AccountsState } from "@/lib/launcher/types"
@@ -29,7 +28,6 @@ export function AccountTab() {
     activeId: MOCK_ACCOUNTS[0]?.id ?? null,
     accounts: MOCK_ACCOUNTS,
   }))
-  const [mode, setMode] = useState<"idle" | "offline" | "microsoft">("idle")
   const [username, setUsername] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -60,9 +58,8 @@ export function AccountTab() {
         : await addOfflineAccount(state, username)
       setState(next)
       setUsername("")
-      setMode("idle")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not add the account.")
+      setError(readableError(e, "Could not add the account."))
     } finally {
       setBusy(false)
     }
@@ -80,7 +77,7 @@ export function AccountTab() {
       setState(next)
       if (next.accounts.length === 0) router.replace("/login")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not remove the account.")
+      setError(readableError(e, "Could not remove the account."))
     }
   }
 
@@ -93,116 +90,50 @@ export function AccountTab() {
         setState((prev) => setActiveAccount(prev, id))
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not select the account.")
+      setError(readableError(e, "Could not select the account."))
     }
-  }
-
-  function handleMicrosoftStub() {
-    setError(
-      "Microsoft sign-in needs the Electron process. It is available when the launcher is packaged.",
-    )
-  }
-
-  function handleMicrosoftLogin() {
-    if (!window.aetherion?.accounts?.addMicrosoft) {
-      setError("Microsoft sign-in will be connected in the Electron process.")
-      return
-    }
-
-    window.aetherion.accounts
-      .addMicrosoft()
-      .then(setState)
-      .catch((e) =>
-        setError(
-          e instanceof Error
-            ? e.message
-            : "Microsoft sign-in is not available in this build yet.",
-        ),
-      )
   }
 
   return (
     <div className="space-y-6">
-      {/* Ações */}
-      {mode === "idle" && (
-        <div className="grid grid-cols-2 gap-3">
-          <AddAccountButton
-            label="Microsoft account"
-            description="Official sign-in with OAuth"
-            icon={<UserPlus className="size-4" />}
-            onClick={handleMicrosoftLogin}
-          />
-          <AddAccountButton
-            label="Offline account"
-            description="Username only"
-            icon={<Plus className="size-4" />}
-            onClick={() => {
+      <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+        <p className="text-sm font-medium text-foreground">Player name</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Used in game. Saved only on this computer.
+        </p>
+
+        <div className="mt-3 flex gap-2">
+          <Input
+            autoFocus
+            placeholder="Name (3–16 characters)"
+            value={username}
+            onChange={(e) => {
+              setUsername(e.target.value)
               setError(null)
-              setMode("offline")
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !validationError) handleAddOffline()
+            }}
+            maxLength={16}
+            className="bg-input/40 font-mono"
+            aria-invalid={!!validationError}
           />
+          <Button
+            onClick={handleAddOffline}
+            disabled={!username || !!validationError || busy}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            Add
+          </Button>
         </div>
-      )}
 
-      {/* Form inline — conta offline */}
-      {mode === "offline" && (
-        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-foreground">New offline account</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                The UUID is generated from the nickname using the same
-                algorithm Mojang uses for offline players.
-              </p>
-            </div>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-7 -mt-1 -mr-1"
-              onClick={() => {
-                setMode("idle")
-                setUsername("")
-                setError(null)
-              }}
-              aria-label="Cancel"
-            >
-              <X className="size-4" />
-            </Button>
-          </div>
-
-          <div className="mt-3 flex gap-2">
-            <Input
-              autoFocus
-              placeholder="Username (3–16 characters)"
-              value={username}
-              onChange={(e) => {
-                setUsername(e.target.value)
-                setError(null)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !validationError) handleAddOffline()
-              }}
-              maxLength={16}
-              className="bg-input/40 font-mono"
-              aria-invalid={!!validationError}
-            />
-            <Button
-              onClick={handleAddOffline}
-              disabled={!username || !!validationError || busy}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              Add
-            </Button>
-          </div>
-
-          {validationError && (
-            <p className="mt-2 text-xs text-destructive flex items-center gap-1.5">
-              <AlertCircle className="size-3" />
-              {validationError}
-            </p>
-          )}
-        </div>
-      )}
+        {validationError && (
+          <p className="mt-2 text-xs text-destructive flex items-center gap-1.5">
+            <AlertCircle className="size-3" />
+            {validationError}
+          </p>
+        )}
+      </div>
 
       {error && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 flex items-start gap-2">
@@ -247,22 +178,9 @@ export function AccountTab() {
                   </Avatar>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {acc.username}
-                      </p>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-[10px] uppercase tracking-wider border-border/60",
-                          acc.type === "microsoft"
-                            ? "text-magic border-magic/40"
-                            : "text-muted-foreground",
-                        )}
-                      >
-                        {acc.type}
-                      </Badge>
-                    </div>
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {acc.username}
+                    </p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground font-mono truncate">
                       {acc.uuid}
                     </p>
@@ -304,30 +222,7 @@ export function AccountTab() {
   )
 }
 
-function AddAccountButton({
-  label,
-  description,
-  icon,
-  onClick,
-}: {
-  label: string
-  description: string
-  icon: React.ReactNode
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex items-center gap-3 p-4 rounded-lg border border-dashed border-border/60 bg-card/50 hover:border-primary/40 hover:bg-primary/5 transition text-left"
-    >
-      <span className="size-10 inline-flex items-center justify-center rounded-md bg-muted text-muted-foreground group-hover:text-primary group-hover:bg-primary/10 transition">
-        {icon}
-      </span>
-      <span>
-        <span className="block text-sm font-medium text-foreground">{label}</span>
-        <span className="block text-xs text-muted-foreground">{description}</span>
-      </span>
-    </button>
-  )
+function readableError(error: unknown, fallback: string) {
+  const raw = error instanceof Error ? error.message : fallback
+  return raw.replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "")
 }

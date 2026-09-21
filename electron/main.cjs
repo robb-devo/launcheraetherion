@@ -240,7 +240,7 @@ ipcMain.handle("accounts:addOffline", async (_event, username) => {
       candidate.username.toLowerCase() === account.username.toLowerCase(),
   )
 
-  if (existing) throw new Error("That offline account is already added.")
+  if (existing) throw new Error("That name is already added.")
 
   const next = {
     activeId: state.activeId ?? account.id,

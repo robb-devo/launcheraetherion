@@ -71,7 +71,7 @@ export async function addOfflineAccount(
   const existing = state.accounts.find(
     (a) => a.type === "offline" && a.username.toLowerCase() === clean.toLowerCase(),
   )
-  if (existing) throw new Error("That offline account is already added.")
+  if (existing) throw new Error("That name is already added.")
 
   const uuid = await offlineUuidFor(clean)
   const account: Account = {
