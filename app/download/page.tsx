@@ -13,7 +13,6 @@ import { AetherionMark } from "@/components/launcher/aetherion-mark"
 import { MOCK_MANIFEST } from "@/lib/launcher/mock-data"
 import { launcherDownloadUrl, releasePageUrl } from "@/lib/launcher/github-releases"
 import { LAUNCHER_VERSION } from "@/lib/launcher/version"
-import { publicAssetPath } from "@/lib/public-path"
 
 const WINDOWS_INSTALLER_FILENAME = `Aetherion.Launcher.Setup.${LAUNCHER_VERSION}.exe`
 const LAUNCHER_REPO = {
@@ -40,10 +39,7 @@ export default function DownloadPage() {
   return (
     <div className="relative min-h-screen bg-background text-foreground">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-50"
-          style={{ backgroundImage: `url(${publicAssetPath("/aetherion-bg.jpg")})` }}
-        />
+        <div className="absolute inset-0 bg-[url('/aetherion-bg.jpg')] bg-cover bg-center opacity-50" />
         <div className="absolute inset-0 aetherion-scrim" />
         <div className="absolute inset-0 aetherion-atmosphere" />
       </div>

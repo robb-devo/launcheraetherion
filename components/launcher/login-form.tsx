@@ -1,6 +1,5 @@
 "use client"
 
-import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -11,7 +10,6 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { addOfflineAccount, validateOfflineUsername } from "@/lib/launcher/accounts"
 import type { AccountsState } from "@/lib/launcher/types"
-import { publicAssetPath } from "@/lib/public-path"
 import { AetherionMark } from "./aetherion-mark"
 
 export function LoginForm() {
@@ -50,14 +48,7 @@ export function LoginForm() {
 
   return (
     <div className="grid h-full w-full grid-cols-12">
-      <div className="relative col-span-5 overflow-hidden border-r border-white/8">
-        <Image
-          src={publicAssetPath("/aetherion-bg.jpg")}
-          alt=""
-          fill
-          priority
-          className="object-cover object-[center_40%]"
-        />
+      <div className="relative col-span-5 overflow-hidden border-r border-white/8 bg-[url('/aetherion-bg.jpg')] bg-cover bg-[center_40%]">
         <div className="absolute inset-0 aetherion-scrim" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/55 to-background/20" />
         <div className="absolute inset-0 aetherion-vignette" />

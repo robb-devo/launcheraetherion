@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Cog, Globe, LogIn, Play, Youtube } from "lucide-react"
@@ -118,14 +117,7 @@ export function Dashboard() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
-      <div className="absolute inset-0">
-        <Image
-          src={publicAssetPath("/aetherion-bg.jpg")}
-          alt=""
-          fill
-          priority
-          className="object-cover object-[center_42%] scale-[1.03]"
-        />
+      <div className="absolute inset-0 bg-[url('/aetherion-bg.jpg')] bg-cover bg-[center_42%] scale-[1.03]">
         <div className="absolute inset-0 aetherion-scrim" />
         <div className="absolute inset-0 aetherion-vignette" />
         <div className="pointer-events-none absolute inset-0 aetherion-atmosphere" />
