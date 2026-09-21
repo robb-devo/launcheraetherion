@@ -1,5 +1,70 @@
 # Publicar o launcher Windows
 
+## Launcher 0.3.1 — atualizacao visual
+
+Este release muda so a interface. Launch, atualizacao do modpack, instalacao, auth e mods continuam os mesmos. O manifest do modpack permanece `v0.4`.
+
+### Bump
+
+| Onde | Valor |
+| --- | --- |
+| `package.json` `version` | `0.3.1` |
+| Electron `LAUNCHER_VERSION` | lido de `package.json` em `electron/main.cjs` |
+| Pagina `/download` e Ajustes | `lib/launcher/version.ts` importa `package.json` |
+| Artefato NSIS | `Aetherion.Launcher.Setup.0.3.1.exe` |
+| Tag GitHub | `v0.3.1` |
+
+A tag e a versao do `package.json` precisam ser iguais. O nome do arquivo vem da versao, e a URL de download usa a tag.
+
+### Canal que ja existe
+
+O launcher `0.3.0` publicado em `washryan/launcheraetherion` nao chama `electron-updater` e os releases nao incluem `latest.yml`. Um instalador ja aberto **nao detecta** a `0.3.1` sozinho na proxima inicializacao.
+
+O caminho normal deste repositorio e o instalador NSIS no GitHub Release. Depois de instalar a `0.3.1`, a proxima abertura ja mostra o design novo.
+
+### Publicar no canal ao vivo (recomendado)
+
+O workflow `.github/workflows/windows-release.yml` so publica no repositorio onde a tag e enviada. Para o download publico continuar em `washryan/launcheraetherion`:
+
+1. Faca merge deste PR em `washryan/launcheraetherion` `main`.
+2. No commit em que `package.json` esta `0.3.1`:
+
+```powershell
+git checkout main
+git pull
+git tag v0.3.1
+git push origin v0.3.1
+```
+
+3. Aguarde o workflow `Build Windows Release` em `https://github.com/washryan/launcheraetherion/actions`.
+4. Ele roda `pnpm build:win:ci` (`next build` + `electron-builder --win nsis --x64 --publish never`) e anexa:
+   - `dist/Aetherion.Launcher.Setup.0.3.1.exe`
+   - `dist/Aetherion.Launcher.Setup.0.3.1.exe.blockmap`
+5. Confirme o download:
+
+```txt
+https://github.com/washryan/launcheraetherion/releases/download/v0.3.1/Aetherion.Launcher.Setup.0.3.1.exe
+```
+
+Jogadores com `0.3.0` atualizam executando esse instalador. O NSIS atualiza a instalacao existente (atalhos e desinstalador ja configurados). Nao e preciso republicar os assets do modpack `v0.4`.
+
+Tambem da para abrir `Build Windows Release` → `Run workflow` e informar `v0.3.1`, desde que o codigo dessa branch ja esteja em `0.3.1`.
+
+### Publicar da maquina Windows
+
+```powershell
+$env:GITHUB_TOKEN="COLE_SEU_TOKEN_AQUI"
+pnpm release:win
+```
+
+`release:win` roda `pnpm build:win` (manifest do modpack + build + electron-builder) e `scripts/publish-windows-release.ps1`. Se `-Version` nao for passado, o script le `package.json`. O token precisa de `Contents: Read and write` em `washryan/launcheraetherion`.
+
+Este ambiente Linux nao gera o instalador Windows. O comando de release continua `pnpm build:win` / `pnpm release:win` no Windows, ou a tag `v0.3.1` no Actions.
+
+---
+
+## Referencia anterior (releases 0.2.x)
+
 Este fluxo faz o botao de download do site parar de cair em 404.
 
 ## Precisa criar GitHub App?

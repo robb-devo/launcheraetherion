@@ -65,19 +65,16 @@ export function LaunchProgressOverlay({ progress, onCancel, onDismiss }: Props) 
       role="dialog"
       aria-live="polite"
       aria-label="Atualizando launcher"
-      className="absolute inset-0 z-50 flex items-center justify-center bg-background/85 backdrop-blur-xl"
+      className="absolute inset-0 z-50 flex items-center justify-center bg-background/78 backdrop-blur-xl"
     >
-      <div className="w-full max-w-xl mx-6 rounded-lg border border-border/60 bg-card/95 p-8 shadow-2xl">
-        {/* Título */}
-        <div className="flex items-center gap-3 mb-6">
+      <div className="aetherion-glass aetherion-rise mx-6 w-full max-w-xl rounded-2xl border-primary/20 p-8">
+        <div className="mb-6 flex items-center gap-3">
           <div
             className={cn(
-              "size-10 rounded-md inline-flex items-center justify-center",
+              "inline-flex size-11 items-center justify-center rounded-xl",
               isError
                 ? "bg-destructive/10 text-destructive"
-                : isDone
-                  ? "bg-primary/10 text-primary"
-                  : "bg-primary/10 text-primary",
+                : "bg-primary/12 text-primary",
             )}
           >
             {isError ? (
@@ -89,30 +86,30 @@ export function LaunchProgressOverlay({ progress, onCancel, onDismiss }: Props) 
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="font-serif text-lg tracking-wide text-foreground">
+            <h2 className="font-serif text-xl tracking-[0.06em] text-foreground">
               {isError
                 ? "Falha na preparação"
                 : isDone
                   ? "Tudo pronto"
                   : "Preparando Aetherion..."}
             </h2>
-            <p className="text-xs text-muted-foreground truncate">{message}</p>
+            <p className="truncate text-xs text-muted-foreground">{message}</p>
           </div>
         </div>
 
         {/* Barra de progresso */}
         {!isError && (
           <>
-            <div className="h-2 w-full rounded-full bg-muted/60 overflow-hidden">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/8">
               <div
                 className={cn(
-                  "h-full bg-primary transition-all duration-300",
-                  percent === undefined && "animate-pulse w-1/3",
+                  "h-full rounded-full bg-primary shadow-[0_0_16px_color-mix(in_oklch,var(--primary)_55%,transparent)] transition-all duration-300",
+                  percent === undefined && "w-1/3 animate-pulse",
                 )}
                 style={percent !== undefined ? { width: `${percent}%` } : undefined}
               />
             </div>
-            <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+            <div className="mt-2.5 flex items-center justify-between text-[11px] tracking-wide text-muted-foreground">
               <span>
                 {filesTotal && filesTotal > 0
                   ? `${filesDone ?? 0} / ${filesTotal} arquivos`
@@ -131,13 +128,13 @@ export function LaunchProgressOverlay({ progress, onCancel, onDismiss }: Props) 
 
         {/* Erro */}
         {isError && error && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive font-mono whitespace-pre-wrap break-words">
+          <div className="whitespace-pre-wrap break-words rounded-xl border border-destructive/40 bg-destructive/10 p-3 font-mono text-xs text-destructive">
             {error}
           </div>
         )}
 
         {/* Etapas */}
-        <ol className="mt-6 space-y-2">
+        <ol className="mt-6 space-y-1.5">
           {PHASE_ORDER.map((p, i) => {
             const Icon = PHASE_META[p].icon
             const state: "done" | "active" | "pending" =
@@ -150,15 +147,13 @@ export function LaunchProgressOverlay({ progress, onCancel, onDismiss }: Props) 
                     : "pending"
 
             return (
-              <li key={p} className="flex items-center gap-3 text-sm">
+              <li key={p} className="flex items-center gap-3 rounded-lg px-1 py-1 text-sm">
                 <span
                   className={cn(
-                    "size-6 shrink-0 rounded-md inline-flex items-center justify-center border",
-                    state === "done" && "border-primary/40 bg-primary/10 text-primary",
-                    state === "active" &&
-                      "border-primary/40 bg-primary/10 text-primary",
-                    state === "pending" &&
-                      "border-border/50 bg-muted/30 text-muted-foreground",
+                    "inline-flex size-7 shrink-0 items-center justify-center rounded-lg border",
+                    state === "done" && "border-primary/35 bg-primary/10 text-primary",
+                    state === "active" && "border-primary/50 bg-primary/15 text-primary",
+                    state === "pending" && "border-white/8 bg-white/3 text-muted-foreground",
                   )}
                 >
                   {state === "done" ? (
@@ -197,7 +192,7 @@ export function LaunchProgressOverlay({ progress, onCancel, onDismiss }: Props) 
             <button
               type="button"
               onClick={onDismiss}
-              className="h-9 px-4 rounded-md border border-border/60 text-sm text-foreground hover:bg-muted/40 transition"
+              className="h-9 rounded-lg border border-white/10 px-4 text-sm text-foreground transition hover:bg-white/6"
             >
               Fechar
             </button>
@@ -205,7 +200,7 @@ export function LaunchProgressOverlay({ progress, onCancel, onDismiss }: Props) 
             <button
               type="button"
               onClick={onCancel}
-              className="h-9 px-4 rounded-md border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 transition"
+              className="h-9 rounded-lg border border-white/10 px-4 text-sm text-muted-foreground transition hover:bg-white/6 hover:text-foreground"
             >
               Cancelar
             </button>

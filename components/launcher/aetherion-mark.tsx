@@ -1,3 +1,4 @@
+import { useId } from "react"
 import { cn } from "@/lib/utils"
 
 /**
@@ -13,6 +14,9 @@ export function AetherionMark({
   className?: string
   size?: number
 }) {
+  const rawId = useId().replace(/:/g, "")
+  const glowId = `ae-glow-${rawId}`
+
   return (
     <svg
       width={size}
@@ -23,34 +27,32 @@ export function AetherionMark({
       role="img"
     >
       <defs>
-        <radialGradient id="ae-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="currentColor" stopOpacity="0.25" />
+        <radialGradient id={glowId} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />
+          <stop offset="62%" stopColor="var(--magic)" stopOpacity="0.12" />
           <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
         </radialGradient>
       </defs>
 
-      {/* glow */}
-      <circle cx="32" cy="32" r="30" fill="url(#ae-glow)" />
+      <circle cx="32" cy="32" r="30" fill={`url(#${glowId})`} />
 
-      {/* anel externo */}
       <circle
         cx="32"
         cy="32"
         r="26"
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.25"
-        opacity="0.7"
+        strokeWidth="1.15"
+        opacity="0.82"
       />
-      {/* anel interno */}
       <circle
         cx="32"
         cy="32"
         r="22"
         fill="none"
-        stroke="currentColor"
-        strokeWidth="0.6"
-        opacity="0.35"
+        stroke="var(--magic)"
+        strokeWidth="0.7"
+        opacity="0.7"
       />
 
       {/* marcas cardeais */}

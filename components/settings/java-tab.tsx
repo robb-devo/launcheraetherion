@@ -100,7 +100,7 @@ export function JavaTab() {
         title="Memoria"
         description={`Total do sistema: ${totalGb.toFixed(1)} GB. Recomendado: 6-10 GB para modpacks.`}
       >
-        <div className="rounded-lg border border-border/50 bg-card/40 p-5 space-y-6">
+        <div className="space-y-6 rounded-2xl border border-white/8 bg-card/40 p-5">
           <MemorySlider
             label="RAM maxima"
             value={java.maxRamMb}
@@ -139,7 +139,7 @@ export function JavaTab() {
         title="Executavel Java"
         description="O launcher valida o binario antes de iniciar o jogo. Use Java 17 ou superior."
       >
-        <div className="rounded-lg border border-border/50 bg-card/40 p-5 space-y-4">
+        <div className="space-y-4 rounded-2xl border border-white/8 bg-card/40 p-5">
           <div className="flex items-start gap-3">
             <div className="size-9 inline-flex items-center justify-center rounded-md bg-primary/10 text-primary shrink-0">
               <CheckCircle2 className="size-5" />

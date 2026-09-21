@@ -146,7 +146,7 @@ export function AccountTab() {
 
       {/* Form inline — conta offline */}
       {mode === "offline" && (
-        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-foreground">Nova conta offline</p>
@@ -230,7 +230,7 @@ export function AccountTab() {
                 <div
                   key={acc.id}
                   className={cn(
-                    "group flex items-center gap-4 p-4 rounded-lg border transition",
+                    "group flex items-center gap-4 rounded-xl border p-4 transition duration-200",
                     active
                       ? "border-primary/40 bg-primary/5"
                       : "border-border/50 bg-card hover:border-border",
@@ -256,7 +256,7 @@ export function AccountTab() {
                         className={cn(
                           "text-[10px] uppercase tracking-wider border-border/60",
                           acc.type === "microsoft"
-                            ? "text-accent border-accent/40"
+                            ? "text-magic border-magic/40"
                             : "text-muted-foreground",
                         )}
                       >

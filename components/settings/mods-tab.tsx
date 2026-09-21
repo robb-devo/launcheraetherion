@@ -270,7 +270,7 @@ function ModRow({
       <div
         className={cn(
           "size-2 rounded-full shrink-0",
-          locked ? "bg-primary" : enabled ? "bg-accent" : "bg-muted",
+          locked ? "bg-primary" : enabled ? "bg-magic" : "bg-muted",
         )}
       />
       <div className="flex-1 min-w-0">

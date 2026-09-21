@@ -12,8 +12,9 @@ import { Button } from "@/components/ui/button"
 import { AetherionMark } from "@/components/launcher/aetherion-mark"
 import { MOCK_MANIFEST } from "@/lib/launcher/mock-data"
 import { launcherDownloadUrl, releasePageUrl } from "@/lib/launcher/github-releases"
+import { LAUNCHER_VERSION } from "@/lib/launcher/version"
+import { publicAssetPath } from "@/lib/public-path"
 
-const LAUNCHER_VERSION = "0.3.0"
 const WINDOWS_INSTALLER_FILENAME = `Aetherion.Launcher.Setup.${LAUNCHER_VERSION}.exe`
 const LAUNCHER_REPO = {
   owner: "washryan",
@@ -33,16 +34,22 @@ const FEATURED_MODS = REQUIRED_MODS.slice(0, 12)
 
 export default function DownloadPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border/40">
-        <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between gap-5">
-          <div className="flex items-center gap-3 min-w-0">
+    <div className="relative min-h-screen bg-background text-foreground">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-50"
+          style={{ backgroundImage: `url(${publicAssetPath("/aetherion-bg.jpg")})` }}
+        />
+        <div className="absolute inset-0 aetherion-scrim" />
+        <div className="absolute inset-0 aetherion-atmosphere" />
+      </div>
+      <header className="relative border-b border-white/8">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-5 px-6 py-5">
+          <div className="flex min-w-0 items-center gap-3">
             <AetherionMark size={36} />
             <div className="min-w-0">
-              <p className="font-serif text-lg tracking-wide">Aetherion</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em]">
-                Reino Etereo
-              </p>
+              <p className="font-serif text-lg tracking-[0.14em]">AETHERION</p>
+              <p className="aetherion-kicker mt-1">Reino Etéreo</p>
             </div>
           </div>
           <nav className="flex items-center gap-4 text-sm">
@@ -63,16 +70,16 @@ export default function DownloadPage() {
         </div>
       </header>
 
-      <section className="max-w-5xl mx-auto px-6 py-16 md:py-20">
+      <section className="relative mx-auto max-w-5xl px-6 py-16 md:py-20">
         <Badge
           variant="outline"
-          className="mb-6 text-[10px] uppercase tracking-[0.25em] border-primary/40 text-primary"
+          className="mb-6 border-primary/40 text-[10px] uppercase tracking-[0.22em] text-primary"
         >
           Windows x64 • Minecraft {MOCK_MANIFEST.minecraft} • Forge {MOCK_MANIFEST.forge.version}
         </Badge>
         <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
           <div>
-            <h1 className="font-serif text-5xl md:text-6xl tracking-[0.1em] text-balance">
+            <h1 className="font-serif text-5xl tracking-[0.14em] text-balance md:text-6xl">
               AETHERION
             </h1>
             <p className="mt-5 text-lg text-muted-foreground max-w-2xl text-balance">
@@ -81,7 +88,7 @@ export default function DownloadPage() {
             </p>
 
             <div className="mt-10 flex flex-col sm:flex-row gap-3">
-              <Button asChild size="lg" className="h-12 px-6 gap-2 aetherion-gold-glow">
+              <Button asChild size="lg" className="h-12 gap-2 px-6 aetherion-gold-glow aetherion-sheen">
                 <a href={WINDOWS_DOWNLOAD_URL}>
                   <Download className="size-4" />
                   Baixar launcher para Windows
@@ -103,7 +110,7 @@ export default function DownloadPage() {
             </p>
           </div>
 
-          <div className="rounded-lg border border-border/50 bg-card/40 p-5">
+          <div className="aetherion-glass rounded-2xl p-5">
             <p className="font-serif text-xl tracking-wide">Download Windows</p>
             <div className="mt-5 grid gap-3 text-sm">
               <DownloadRow label="Sistema" value="Windows 10/11 x64" />
@@ -150,7 +157,7 @@ export default function DownloadPage() {
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURED_MODS.map((mod) => (
-            <div key={mod.path} className="rounded-lg border border-border/50 bg-card/40 p-4">
+            <div key={mod.path} className="rounded-xl border border-white/8 bg-card/50 p-4">
               <div className="flex items-start gap-3">
                 <Package className="size-4 text-primary mt-0.5 shrink-0" />
                 <div className="min-w-0">
@@ -182,7 +189,7 @@ export default function DownloadPage() {
               GitHub
             </a>
           </div>
-          <div className="rounded-lg border border-border/50 bg-card/40 p-6">
+          <div className="aetherion-glass rounded-2xl p-6">
             <p className="font-serif text-lg tracking-wide">
               v{MOCK_MANIFEST.version}{" "}
               <span className="text-muted-foreground text-sm font-sans">

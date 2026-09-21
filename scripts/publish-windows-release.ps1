@@ -1,5 +1,5 @@
 param(
-  [string]$Version = "0.3.0",
+  [string]$Version = "",
   [string]$Owner = "washryan",
   [string]$Repo = "launcheraetherion",
   [string]$InstallerPath = "",
@@ -7,6 +7,14 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $Version) {
+  $packageJson = Get-Content (Join-Path (Get-Location) "package.json") -Raw | ConvertFrom-Json
+  $Version = $packageJson.version
+  if (-not $Version) {
+    throw "package.json nao tem version. Passe -Version explicitamente."
+  }
+}
 
 if (-not $env:GITHUB_TOKEN) {
   throw "Defina GITHUB_TOKEN com permissao de Contents: Read and write antes de publicar."

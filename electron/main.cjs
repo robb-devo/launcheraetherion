@@ -11,7 +11,7 @@ const zlib = require("node:zlib")
 const isDev = !app.isPackaged
 const USERNAME_REGEX = /^[A-Za-z0-9_]{3,16}$/
 const LAUNCHER_NAME = "AetherionLauncher"
-const LAUNCHER_VERSION = "0.3.0"
+const LAUNCHER_VERSION = require("../package.json").version
 const MOJANG_VERSION_MANIFEST =
   "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 const MINECRAFT_RESOURCES_BASE = "https://resources.download.minecraft.net"
@@ -94,7 +94,7 @@ function createWindow() {
     minHeight: 700,
     frame: false,
     titleBarStyle: "hidden",
-    backgroundColor: "#0a0905",
+    backgroundColor: "#121018",
     icon: appIconPath(),
     show: false,
     webPreferences: {

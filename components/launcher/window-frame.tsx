@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import type React from "react"
 import { Minus, Square, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { AetherionMark } from "./aetherion-mark"
 
 /**
  * WindowFrame — simula a chrome de uma janela desktop.
@@ -35,29 +36,34 @@ export function WindowFrame({
   return (
     <div
       className={cn(
-        "w-full bg-background overflow-hidden",
+        "w-full overflow-hidden text-foreground",
         isElectron
-          ? "h-screen p-0"
-          : "min-h-dvh flex items-center justify-center p-6",
+          ? "h-screen bg-background p-0"
+          : "min-h-dvh flex items-center justify-center bg-background p-6 sm:p-10",
       )}
     >
+      {!isElectron && (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--magic)_16%,transparent),transparent_46%),radial-gradient(ellipse_at_bottom,color-mix(in_oklch,var(--primary)_10%,transparent),transparent_42%)]"
+        />
+      )}
       <div
         className={cn(
-          "w-full overflow-hidden bg-card flex flex-col",
+          "relative z-10 w-full overflow-hidden bg-background flex flex-col",
           isElectron
             ? "h-full rounded-none border-0 shadow-none"
-            : "max-w-[1200px] h-[760px] rounded-xl border border-border/60 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)]",
+            : "max-w-[1200px] h-[760px] rounded-2xl border border-white/10 shadow-[0_40px_120px_-36px_rgba(0,0,0,0.85)]",
           className,
         )}
       >
-        {/* Title bar */}
         <header
-          className="h-10 shrink-0 flex items-center justify-between px-4 bg-background/40 border-b border-border/50 select-none"
+          className="h-11 shrink-0 flex items-center justify-between pl-4 pr-2 bg-background/80 border-b border-white/6 select-none"
           style={isElectron ? ({ WebkitAppRegion: "drag" } as React.CSSProperties) : undefined}
         >
-          <div className="flex items-center gap-2">
-            <div className="size-4 rounded-sm bg-primary/90 aetherion-gold-glow" aria-hidden />
-            <span className="text-xs font-medium tracking-wider text-foreground/80 font-serif">
+          <div className="flex items-center gap-2.5">
+            <AetherionMark size={18} />
+            <span className="text-[11px] font-medium tracking-[0.18em] uppercase text-foreground/75 font-serif">
               {title}
             </span>
           </div>
@@ -91,9 +97,9 @@ function WindowButton({
       type="button"
       style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       className={cn(
-        "size-7 rounded-md inline-flex items-center justify-center text-muted-foreground transition",
-        "hover:bg-muted hover:text-foreground",
-        variant === "danger" && "hover:bg-destructive hover:text-destructive-foreground",
+        "h-8 w-10 rounded-md inline-flex items-center justify-center text-muted-foreground/80 transition-colors duration-150",
+        "hover:bg-white/6 hover:text-foreground",
+        variant === "danger" && "hover:bg-destructive hover:text-white",
       )}
       {...props}
     >

@@ -10,6 +10,7 @@ import {
   SettingsSection,
 } from "@/components/launcher/settings-shell"
 import { DEFAULT_SETTINGS } from "@/lib/launcher/mock-data"
+import { LAUNCHER_BUILD_LABEL, LAUNCHER_VERSION } from "@/lib/launcher/version"
 
 export function LauncherTab() {
   const [prefs, setPrefs] = useState(DEFAULT_SETTINGS.launcher)
@@ -153,9 +154,9 @@ export function LauncherTab() {
       </SettingsSection>
 
       <SettingsSection title="Sobre">
-        <div className="rounded-lg border border-border/50 bg-card/40 p-5 space-y-3">
-          <InfoLine label="Launcher" value="Aetherion v0.3.0" />
-          <InfoLine label="Build" value="2026.04.21" />
+        <div className="aetherion-glass space-y-3 rounded-2xl p-5">
+          <InfoLine label="Launcher" value={`Aetherion v${LAUNCHER_VERSION}`} />
+          <InfoLine label="Build" value={LAUNCHER_BUILD_LABEL} />
           <InfoLine label="Electron" value="Real" />
           <InfoLine label="Node" value="Runtime local" />
         </div>
@@ -179,7 +180,7 @@ function ActionCard({
     <button
       type="button"
       onClick={onClick}
-      className="text-left p-4 rounded-lg border border-border/50 bg-card/40 hover:border-primary/40 hover:bg-primary/5 transition"
+      className="rounded-xl border border-white/8 bg-card/40 p-4 text-left transition duration-200 hover:border-primary/40 hover:bg-primary/5"
     >
       <span className="inline-flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
         {icon}
