@@ -66,7 +66,7 @@ export function Dashboard() {
       return
     }
     abortRef.current = controller
-    setProgress({ phase: "fetching-manifest", message: "Iniciando..." })
+    setProgress({ phase: "fetching-manifest", message: "Starting..." })
 
     try {
       if (window.aetherion?.launch) {
@@ -102,7 +102,7 @@ export function Dashboard() {
       }
       setProgress({
         phase: "error",
-        message: "Falha na preparação",
+        message: "Preparation failed",
         error: err instanceof Error ? err.message : String(err),
       })
     }
@@ -140,7 +140,7 @@ export function Dashboard() {
                 AETHERION
               </h1>
               <p className="mt-2 flex items-center gap-2">
-                <span className="aetherion-kicker text-primary/85!">Reino Etéreo</span>
+                <span className="aetherion-kicker text-primary/85!">Ethereal Realm</span>
                 <span className="text-muted-foreground/40" aria-hidden>
                   ·
                 </span>
@@ -157,7 +157,7 @@ export function Dashboard() {
             />
           ) : (
             <Button asChild variant="outline" className="h-11 border-white/10 bg-background/50 px-5 backdrop-blur-md">
-              <Link href="/login">Entrar</Link>
+              <Link href="/login">Sign in</Link>
             </Button>
           )}
         </header>
@@ -178,14 +178,14 @@ export function Dashboard() {
           <div className="aetherion-dock grid grid-cols-12 items-center gap-5 rounded-2xl px-5 py-4">
             <div className="col-span-5 flex items-center gap-6">
               <StatusBlock
-                label="Jogadores"
+                label="Players"
                 value={`${MOCK_SERVER_STATUS.players.current} / ${MOCK_SERVER_STATUS.players.max}`}
                 dotClass="bg-primary text-primary"
               />
               <span className="hidden h-8 w-px bg-white/10 sm:block" aria-hidden />
               <StatusBlock
                 label="Mojang"
-                value={MOCK_MOJANG_STATUS.auth === "green" ? "Online" : "Instável"}
+                value={MOCK_MOJANG_STATUS.auth === "green" ? "Online" : "Unstable"}
                 dotClass={
                   MOCK_MOJANG_STATUS.auth === "green"
                     ? "bg-primary text-primary"
@@ -201,7 +201,7 @@ export function Dashboard() {
             </div>
 
             <div className="col-span-3 flex items-center justify-center gap-2">
-              <IconLink href="/settings/account" label="Configurações">
+              <IconLink href="/settings/account" label="Settings">
                 <Cog className="size-4" />
               </IconLink>
               <IconLink href="#" label="Site">
@@ -217,7 +217,7 @@ export function Dashboard() {
 
             <div className="col-span-4 flex items-center justify-end gap-4">
               <div className="text-right">
-                <p className="aetherion-kicker">Instância</p>
+                <p className="aetherion-kicker">Instance</p>
                 <p className="mt-1 text-sm font-medium text-foreground">
                   {MOCK_MANIFEST.name}
                 </p>
@@ -238,7 +238,7 @@ export function Dashboard() {
               >
                 <span className="inline-flex items-center gap-2.5">
                   <Play className="size-4 fill-primary-foreground" />
-                  JOGAR
+                  PLAY
                 </span>
               </Button>
             </div>
@@ -322,7 +322,7 @@ function AccountBadge({
       </Avatar>
       <Link
         href="/login"
-        aria-label="Trocar conta"
+        aria-label="Switch account"
         className="ml-0.5 inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-white/6 hover:text-primary"
       >
         <LogIn className="size-4" />

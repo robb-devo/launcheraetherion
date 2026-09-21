@@ -4,8 +4,8 @@ import { MinecraftTab } from "@/components/settings/minecraft-tab"
 export default function MinecraftPage() {
   return (
     <SettingsPage
-      title="Configurações do Minecraft"
-      description="Opções relacionadas à inicialização do jogo."
+      title="Minecraft settings"
+      description="Options for how the game starts."
     >
       <MinecraftTab />
     </SettingsPage>

@@ -1,33 +1,50 @@
-# Publicar o launcher Windows
+# Publish the Windows launcher
 
-## Launcher 0.3.1 — atualizacao visual
+## Launcher 0.3.1 — visual polish and in-app updates
 
-Este release muda so a interface. Launch, atualizacao do modpack, instalacao, auth e mods continuam os mesmos. O manifest do modpack permanece `v0.4`.
+This release keeps launch, modpack install, auth, and instance paths the same. The modpack stays `v0.4`. The launcher itself now updates through `electron-updater`, separate from the modpack updater in `runUpdater()`.
 
-### Bump
+Player data paths are unchanged. See `docs/DATA_SAFETY.md`.
 
-| Onde | Valor |
+### Version
+
+| Where | Value |
 | --- | --- |
 | `package.json` `version` | `0.3.1` |
-| Electron `LAUNCHER_VERSION` | lido de `package.json` em `electron/main.cjs` |
-| Pagina `/download` e Ajustes | `lib/launcher/version.ts` importa `package.json` |
-| Artefato NSIS | `Aetherion.Launcher.Setup.0.3.1.exe` |
-| Tag GitHub | `v0.3.1` |
+| Electron `LAUNCHER_VERSION` | read from `package.json` in `electron/main.cjs` |
+| `/download` and settings | `lib/launcher/version.ts` imports `package.json` |
+| NSIS artifact | `Aetherion.Launcher.Setup.0.3.1.exe` |
+| Update feed | `dist/latest.yml` plus the `.exe.blockmap` |
+| GitHub tag | `v0.3.1` |
+| Publish target | `washryan/launcheraetherion` (`build.publish`) |
 
-A tag e a versao do `package.json` precisam ser iguais. O nome do arquivo vem da versao, e a URL de download usa a tag.
+The tag and `package.json` version must match. Fresh installs still use the NSIS installer (`oneClick: false`, per-user, directory can be chosen).
 
-### Canal que ja existe
+### What an installed 0.3.1 launcher does
 
-O launcher `0.3.0` publicado em `washryan/launcheraetherion` nao chama `electron-updater` e os releases nao incluem `latest.yml`. Um instalador ja aberto **nao detecta** a `0.3.1` sozinho na proxima inicializacao.
+On startup, and again when the window is focused (at most once every 10 minutes), the packaged app asks GitHub Releases for a newer stable version. The feed is `latest.yml` on the repository's latest release.
 
-O caminho normal deste repositorio e o instalador NSIS no GitHub Release. Depois de instalar a `0.3.1`, a proxima abertura ja mostra o design novo.
+If a newer build exists:
 
-### Publicar no canal ao vivo (recomendado)
+1. The launcher shows an update card.
+2. The progress bar uses real download bytes (`transferred / total`). It stays empty until the release reports a size.
+3. After the download finishes, the launcher restarts into the new build (`quitAndInstall`, silent NSIS).
+4. If Minecraft is launching or attached to the launcher, the restart waits and the card offers Restart.
 
-O workflow `.github/workflows/windows-release.yml` so publica no repositorio onde a tag e enviada. Para o download publico continuar em `washryan/launcheraetherion`:
+Dev mode (`next dev`) does not check for updates.
 
-1. Faca merge deste PR em `washryan/launcheraetherion` `main`.
-2. No commit em que `package.json` esta `0.3.1`:
+### One-time bridge from 0.3.0
+
+The published `0.3.0` binary does not contain `electron-updater`, and the `v0.3.0` release has no `latest.yml`. That install cannot discover `0.3.1` by itself.
+
+Players on `0.3.0` install `Aetherion.Launcher.Setup.0.3.1.exe` once. NSIS upgrades the same app id (`gg.aetherion.launcher`) and leaves `%APPDATA%\Aetherion Launcher` in place. Every release after `0.3.1` is detected on the next start. No browser download is required for those later updates.
+
+### Ship on the live channel
+
+The workflow `.github/workflows/windows-release.yml` publishes only in the repository where the tag is pushed. The live channel is `washryan/launcheraetherion`.
+
+1. Merge this PR into `washryan/launcheraetherion` `main`.
+2. On that commit, with `package.json` at `0.3.1`:
 
 ```powershell
 git checkout main
@@ -36,30 +53,32 @@ git tag v0.3.1
 git push origin v0.3.1
 ```
 
-3. Aguarde o workflow `Build Windows Release` em `https://github.com/washryan/launcheraetherion/actions`.
-4. Ele roda `pnpm build:win:ci` (`next build` + `electron-builder --win nsis --x64 --publish never`) e anexa:
+3. Wait for `Build Windows Release` at `https://github.com/washryan/launcheraetherion/actions`.
+4. The workflow runs `pnpm build:win:ci`, which stages `electron-updater` into `electron/vendor`, builds the static app, and runs `electron-builder --win nsis --x64 --publish never`. `--publish never` still writes `latest.yml` because `build.publish` is set. The workflow uploads, and marks the release latest:
    - `dist/Aetherion.Launcher.Setup.0.3.1.exe`
    - `dist/Aetherion.Launcher.Setup.0.3.1.exe.blockmap`
-5. Confirme o download:
+   - `dist/latest.yml`
+5. Confirm the release page lists those three files and is the latest release:
 
 ```txt
 https://github.com/washryan/launcheraetherion/releases/download/v0.3.1/Aetherion.Launcher.Setup.0.3.1.exe
+https://github.com/washryan/launcheraetherion/releases/latest/download/latest.yml
 ```
 
-Jogadores com `0.3.0` atualizam executando esse instalador. O NSIS atualiza a instalacao existente (atalhos e desinstalador ja configurados). Nao e preciso republicar os assets do modpack `v0.4`.
+Do not republish the modpack `v0.4` jars for this launcher release. Modpack publishes must stay off GitHub "Latest" (`scripts/publish-modpack-release.ps1` sets `make_latest` to false). `electron-updater` reads the latest release, then `latest.yml`. A modpack release marked latest would hide the launcher feed.
 
-Tambem da para abrir `Build Windows Release` → `Run workflow` e informar `v0.3.1`, desde que o codigo dessa branch ja esteja em `0.3.1`.
+You can also open `Build Windows Release` → `Run workflow` and pass `v0.3.1`, as long as that ref is already version `0.3.1`.
 
-### Publicar da maquina Windows
+### Publish from a Windows machine
 
 ```powershell
-$env:GITHUB_TOKEN="COLE_SEU_TOKEN_AQUI"
+$env:GITHUB_TOKEN="PASTE_YOUR_TOKEN_HERE"
 pnpm release:win
 ```
 
-`release:win` roda `pnpm build:win` (manifest do modpack + build + electron-builder) e `scripts/publish-windows-release.ps1`. Se `-Version` nao for passado, o script le `package.json`. O token precisa de `Contents: Read and write` em `washryan/launcheraetherion`.
+`release:win` runs `pnpm build:win` and `scripts/publish-windows-release.ps1`. The script reads the version from `package.json`, refuses to upload if `dist/latest.yml` is missing, uploads the exe, blockmap, and `latest.yml`, and marks that release latest. The token needs `Contents: Read and write` on `washryan/launcheraetherion`.
 
-Este ambiente Linux nao gera o instalador Windows. O comando de release continua `pnpm build:win` / `pnpm release:win` no Windows, ou a tag `v0.3.1` no Actions.
+This Linux environment does not produce the Windows installer. The release command remains `pnpm build:win` / `pnpm release:win` on Windows, or the `v0.3.1` tag on Actions.
 
 ---
 

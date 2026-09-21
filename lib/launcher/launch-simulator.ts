@@ -29,15 +29,15 @@ export async function simulateLaunch(opts: SimulateOptions): Promise<void> {
     duration = 600,
     extra: Partial<LaunchProgress> = {},
   ) => {
-    if (signal?.aborted) throw new DOMException("Cancelado", "AbortError")
+    if (signal?.aborted) throw new DOMException("Cancelled", "AbortError")
     onProgress({ phase, message, ...extra })
     await sleep(duration, signal)
   }
 
-  await step("fetching-manifest", "Buscando manifest.json no GitHub Pages...", 700)
+  await step("fetching-manifest", "Fetching manifest.json...", 700)
   await step(
     "computing-plan",
-    `Manifest v${manifest.version} — comparando com estado local...`,
+    `Manifest v${manifest.version} — comparing with the local instance...`,
     500,
   )
 
@@ -53,11 +53,11 @@ export async function simulateLaunch(opts: SimulateOptions): Promise<void> {
     installedHashes: {},
   })
 
-  await step("checking-java", "Procurando Java 17 no sistema...", 500)
-  await step("downloading-java", "Java 17 encontrado (Temurin). Pulando download.", 400)
+  await step("checking-java", "Looking for Java 17 on this PC...", 500)
+  await step("downloading-java", "Java 17 found (Temurin). Skipping download.", 400)
 
   if (plan.needsForgeInstall) {
-    await step("installing-forge", `Instalando Forge ${manifest.forge.version}...`, 900)
+    await step("installing-forge", `Installing Forge ${manifest.forge.version}...`, 900)
   }
 
   // Fase de downloads com progresso real baseado no plano
@@ -72,7 +72,7 @@ export async function simulateLaunch(opts: SimulateOptions): Promise<void> {
   )
 
   for (const action of downloads) {
-    if (signal?.aborted) throw new DOMException("Cancelado", "AbortError")
+    if (signal?.aborted) throw new DOMException("Cancelled", "AbortError")
 
     // Simula download em 3 "ticks" por arquivo
     const chunk = action.size / 3
@@ -81,7 +81,7 @@ export async function simulateLaunch(opts: SimulateOptions): Promise<void> {
       loadedBytes += chunk
       onProgress({
         phase: "downloading-files",
-        message: `Baixando ${displayName(action.path)}...`,
+        message: `Downloading ${displayName(action.path)}...`,
         totalBytes,
         loadedBytes: Math.min(loadedBytes, totalBytes),
         filesDone,
@@ -93,21 +93,21 @@ export async function simulateLaunch(opts: SimulateOptions): Promise<void> {
     // Dispara um erro de exemplo em 20% do caminho quando pedido
     if (opts.forceError && filesDone === Math.ceil(filesTotal * 0.3)) {
       throw new Error(
-        `HashMismatchError: SHA-256 não confere para ${action.path}\n` +
-          `  esperado: ${action.sha256.slice(0, 16)}...\n` +
-          `  recebido: 000000000000...`,
+        `HashMismatchError: SHA-256 does not match for ${action.path}\n` +
+          `  expected: ${action.sha256.slice(0, 16)}...\n` +
+          `  received: 000000000000...`,
       )
     }
   }
 
   await step(
     "verifying",
-    `${filesTotal} arquivos baixados. Verificando integridade...`,
+    `${filesTotal} files downloaded. Verifying integrity...`,
     700,
     { totalBytes, loadedBytes: totalBytes, filesDone: filesTotal, filesTotal },
   )
-  await step("launching", "Iniciando processo javaw...", 600)
-  onProgress({ phase: "running", message: "Minecraft em execução" })
+  await step("launching", "Starting the javaw process...", 600)
+  onProgress({ phase: "running", message: "Minecraft is running" })
 }
 
 /* -------------------------------------------------------------------------- */
@@ -118,13 +118,13 @@ function displayName(path: string): string {
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (signal?.aborted) return reject(new DOMException("Cancelado", "AbortError"))
+    if (signal?.aborted) return reject(new DOMException("Cancelled", "AbortError"))
     const id = setTimeout(resolve, ms)
     signal?.addEventListener(
       "abort",
       () => {
         clearTimeout(id)
-        reject(new DOMException("Cancelado", "AbortError"))
+        reject(new DOMException("Cancelled", "AbortError"))
       },
       { once: true },
     )

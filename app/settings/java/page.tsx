@@ -4,8 +4,8 @@ import { JavaTab } from "@/components/settings/java-tab"
 export default function JavaPage() {
   return (
     <SettingsPage
-      title="Configurações Java"
-      description="Gerencie memória, executável e argumentos JVM. O launcher seleciona a versão correta automaticamente por instância."
+      title="Java settings"
+      description="Manage memory, the executable, and JVM arguments. The launcher picks the right version for each instance."
     >
       <JavaTab />
     </SettingsPage>

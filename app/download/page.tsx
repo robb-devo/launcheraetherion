@@ -49,7 +49,7 @@ export default function DownloadPage() {
             <AetherionMark size={36} />
             <div className="min-w-0">
               <p className="font-serif text-lg tracking-[0.14em]">AETHERION</p>
-              <p className="aetherion-kicker mt-1">Reino Etéreo</p>
+              <p className="aetherion-kicker mt-1">Ethereal Realm</p>
             </div>
           </div>
           <nav className="flex items-center gap-4 text-sm">
@@ -83,15 +83,15 @@ export default function DownloadPage() {
               AETHERION
             </h1>
             <p className="mt-5 text-lg text-muted-foreground max-w-2xl text-balance">
-              Baixe o launcher oficial para Windows, entre com sua conta local e jogue com
-              Forge, mods, shaders, Java e integridade preparados pelo Aetherion.
+              Download the official Windows launcher, sign in with a local account, and play
+              with Forge, mods, shaders, Java, and integrity checks prepared by Aetherion.
             </p>
 
             <div className="mt-10 flex flex-col sm:flex-row gap-3">
               <Button asChild size="lg" className="h-12 gap-2 px-6 aetherion-gold-glow aetherion-sheen">
                 <a href={WINDOWS_DOWNLOAD_URL}>
                   <Download className="size-4" />
-                  Baixar launcher para Windows
+                  Download launcher for Windows
                 </a>
               </Button>
               <Button
@@ -100,7 +100,7 @@ export default function DownloadPage() {
                 size="lg"
                 className="h-12 px-5 bg-transparent"
               >
-                <a href={LAUNCHER_RELEASE_URL}>Ver release</a>
+                <a href={LAUNCHER_RELEASE_URL}>View release</a>
               </Button>
             </div>
 
@@ -113,11 +113,11 @@ export default function DownloadPage() {
           <div className="aetherion-glass rounded-2xl p-5">
             <p className="font-serif text-xl tracking-wide">Download Windows</p>
             <div className="mt-5 grid gap-3 text-sm">
-              <DownloadRow label="Sistema" value="Windows 10/11 x64" />
-              <DownloadRow label="Arquivo" value={WINDOWS_INSTALLER_FILENAME} />
-              <DownloadRow label="Instalador" value="NSIS, atalho e desinstalador" />
-              <DownloadRow label="Modpack" value={`${REQUIRED_MODS.length} obrigatorios`} />
-              <DownloadRow label="Opcionais" value={`${OPTIONAL_MODS.length} selecionaveis`} />
+              <DownloadRow label="System" value="Windows 10/11 x64" />
+              <DownloadRow label="File" value={WINDOWS_INSTALLER_FILENAME} />
+              <DownloadRow label="Installer" value="NSIS, shortcut, and uninstaller" />
+              <DownloadRow label="Modpack" value={`${REQUIRED_MODS.length} required`} />
+              <DownloadRow label="Optional" value={`${OPTIONAL_MODS.length} selectable`} />
             </div>
           </div>
         </div>
@@ -127,18 +127,18 @@ export default function DownloadPage() {
         <div className="max-w-5xl mx-auto px-6 py-14 grid gap-8 md:grid-cols-3">
           <Feature
             icon={<Shield className="size-5" />}
-            title="Integridade por SHA-256"
-            description="Arquivos do modpack sao conferidos antes do Minecraft iniciar."
+            title="SHA-256 integrity"
+            description="Modpack files are checked before Minecraft starts."
           />
           <Feature
             icon={<Settings className="size-5" />}
-            title="Configuracoes locais"
-            description="Resolucao, RAM, Java, logs, cache e pasta da instancia ficam no seu PC."
+            title="Local settings"
+            description="Resolution, RAM, Java, logs, cache, and the instance folder stay on your PC."
           />
           <Feature
             icon={<Server className="size-5" />}
-            title="Servidor pronto"
-            description="A inicializacao pode conectar direto em left-fcc.gl.joinmc.link."
+            title="Server ready"
+            description="Startup can connect straight to left-fcc.gl.joinmc.link."
           />
         </div>
       </section>
@@ -146,13 +146,13 @@ export default function DownloadPage() {
       <section className="max-w-5xl mx-auto px-6 py-16">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-6">
           <div>
-            <h2 className="font-serif text-2xl tracking-wide">Modpack Incluso</h2>
+            <h2 className="font-serif text-2xl tracking-wide">Included modpack</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Obrigatorios ficam travados; opcionais podem ser ligados nas configuracoes.
+              Required mods stay locked. Optional mods can be toggled in settings.
             </p>
           </div>
           <a href={MODPACK_RELEASE_URL} className="text-sm text-primary hover:underline">
-            Assets do modpack
+            Modpack assets
           </a>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -162,7 +162,7 @@ export default function DownloadPage() {
                 <Package className="size-4 text-primary mt-0.5 shrink-0" />
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{mod.name}</p>
-                  <p className="text-[11px] text-muted-foreground mt-1">Obrigatorio</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">Required</p>
                 </div>
               </div>
             </div>
@@ -195,7 +195,7 @@ export default function DownloadPage() {
               <span className="text-muted-foreground text-sm font-sans">
                 •{" "}
                 {MOCK_MANIFEST.publishedAt &&
-                  new Date(MOCK_MANIFEST.publishedAt).toLocaleDateString("pt-BR")}
+                  new Date(MOCK_MANIFEST.publishedAt).toLocaleDateString("en-US")}
               </span>
             </p>
             <pre className="mt-3 text-sm text-muted-foreground whitespace-pre-wrap font-sans leading-relaxed">
@@ -208,7 +208,7 @@ export default function DownloadPage() {
       <footer className="border-t border-border/40">
         <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            © 2026 Aetherion Network • Nao afiliado a Mojang Studios
+            © 2026 Aetherion Network • Not affiliated with Mojang Studios
           </p>
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <a

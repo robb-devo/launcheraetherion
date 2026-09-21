@@ -4,8 +4,8 @@ import { AccountTab } from "@/components/settings/account-tab"
 export default function AccountPage() {
   return (
     <SettingsPage
-      title="Configurações da conta"
-      description="Adicione, remova ou selecione a conta ativa. Contas Microsoft e offline coexistem."
+      title="Account settings"
+      description="Add, remove, or select the active account. Microsoft and offline accounts can live together."
     >
       <AccountTab />
     </SettingsPage>

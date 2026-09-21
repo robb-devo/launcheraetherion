@@ -25,17 +25,17 @@ const PHASE_META: Record<
   LaunchPhase,
   { label: string; icon: React.ComponentType<{ className?: string }> }
 > = {
-  idle: { label: "Aguardando", icon: Loader2 },
-  "fetching-manifest": { label: "Buscando manifest", icon: Search },
-  "computing-plan": { label: "Calculando diferenças", icon: Search },
-  "checking-java": { label: "Verificando Java", icon: Coffee },
-  "downloading-java": { label: "Baixando runtime Java", icon: Download },
-  "installing-forge": { label: "Instalando Forge", icon: Hammer },
-  "downloading-files": { label: "Baixando mods e configs", icon: Download },
-  verifying: { label: "Verificando integridade", icon: CheckCircle2 },
-  launching: { label: "Iniciando Minecraft", icon: Rocket },
-  running: { label: "Jogo em execução", icon: Rocket },
-  error: { label: "Erro", icon: ServerCrash },
+  idle: { label: "Waiting", icon: Loader2 },
+  "fetching-manifest": { label: "Fetching manifest", icon: Search },
+  "computing-plan": { label: "Computing differences", icon: Search },
+  "checking-java": { label: "Checking Java", icon: Coffee },
+  "downloading-java": { label: "Downloading Java runtime", icon: Download },
+  "installing-forge": { label: "Installing Forge", icon: Hammer },
+  "downloading-files": { label: "Downloading mods and configs", icon: Download },
+  verifying: { label: "Verifying integrity", icon: CheckCircle2 },
+  launching: { label: "Starting Minecraft", icon: Rocket },
+  running: { label: "Game running", icon: Rocket },
+  error: { label: "Error", icon: ServerCrash },
 }
 
 function formatBytes(n?: number): string {
@@ -64,7 +64,7 @@ export function LaunchProgressOverlay({ progress, onCancel, onDismiss }: Props) 
     <div
       role="dialog"
       aria-live="polite"
-      aria-label="Atualizando launcher"
+      aria-label="Preparing the instance"
       className="absolute inset-0 z-50 flex items-center justify-center bg-background/78 backdrop-blur-xl"
     >
       <div className="aetherion-glass aetherion-rise mx-6 w-full max-w-xl rounded-2xl border-primary/20 p-8">
@@ -88,10 +88,10 @@ export function LaunchProgressOverlay({ progress, onCancel, onDismiss }: Props) 
           <div className="flex-1 min-w-0">
             <h2 className="font-serif text-xl tracking-[0.06em] text-foreground">
               {isError
-                ? "Falha na preparação"
+                ? "Preparation failed"
                 : isDone
-                  ? "Tudo pronto"
-                  : "Preparando Aetherion..."}
+                  ? "Ready"
+                  : "Preparing Aetherion..."}
             </h2>
             <p className="truncate text-xs text-muted-foreground">{message}</p>
           </div>
@@ -112,7 +112,7 @@ export function LaunchProgressOverlay({ progress, onCancel, onDismiss }: Props) 
             <div className="mt-2.5 flex items-center justify-between text-[11px] tracking-wide text-muted-foreground">
               <span>
                 {filesTotal && filesTotal > 0
-                  ? `${filesDone ?? 0} / ${filesTotal} arquivos`
+                  ? `${filesDone ?? 0} / ${filesTotal} files`
                   : "\u00a0"}
               </span>
               <span>
@@ -194,7 +194,7 @@ export function LaunchProgressOverlay({ progress, onCancel, onDismiss }: Props) 
               onClick={onDismiss}
               className="h-9 rounded-lg border border-white/10 px-4 text-sm text-foreground transition hover:bg-white/6"
             >
-              Fechar
+              Close
             </button>
           ) : (
             <button
@@ -202,7 +202,7 @@ export function LaunchProgressOverlay({ progress, onCancel, onDismiss }: Props) 
               onClick={onCancel}
               className="h-9 rounded-lg border border-white/10 px-4 text-sm text-muted-foreground transition hover:bg-white/6 hover:text-foreground"
             >
-              Cancelar
+              Cancel
             </button>
           )}
         </div>

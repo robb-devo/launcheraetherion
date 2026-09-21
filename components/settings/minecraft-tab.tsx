@@ -46,10 +46,10 @@ export function MinecraftTab() {
   return (
     <>
       <SettingsSection
-        title="Vídeo"
-        description="Resolução inicial e modo de tela do jogo."
+        title="Video"
+        description="Starting resolution and how the game fills the screen."
       >
-        <SettingsRow label="Resolução do jogo" description="Usada quando não está em tela cheia.">
+        <SettingsRow label="Game resolution" description="Used when the game is not fullscreen.">
           <div className="flex items-center gap-2">
             <Input
               type="number"
@@ -78,8 +78,8 @@ export function MinecraftTab() {
         </SettingsRow>
 
         <SettingsRow
-          label="Iniciar em tela cheia"
-          description="Substitui a resolução acima quando ativado."
+          label="Start in fullscreen"
+          description="Overrides the resolution above when it is on."
         >
           <Switch
             checked={settings.fullscreen}
@@ -89,12 +89,12 @@ export function MinecraftTab() {
       </SettingsSection>
 
       <SettingsSection
-        title="Inicialização"
-        description="Comportamento do jogo ao ser lançado."
+        title="Startup"
+        description="How the game behaves when it starts."
       >
         <SettingsRow
-          label="Conectar automaticamente ao servidor"
-          description="Entra direto no Aetherion assim que o jogo abrir."
+          label="Connect to the server automatically"
+          description="Joins Aetherion as soon as the game opens."
         >
           <Switch
             checked={settings.autoConnectServer}
@@ -103,8 +103,8 @@ export function MinecraftTab() {
         </SettingsRow>
 
         <SettingsRow
-          label="Processo separado do launcher"
-          description="Se desligado, fechar o launcher também fecha o jogo."
+          label="Separate process from the launcher"
+          description="When this is off, closing the launcher also closes the game."
         >
           <Switch
             checked={settings.detachProcess}
@@ -119,8 +119,8 @@ export function MinecraftTab() {
         </SettingsRow>
 
         <SettingsRow
-          label="Fechar launcher ao abrir o jogo"
-          description="Libera RAM enquanto você joga."
+          label="Close the launcher when the game opens"
+          description="Frees RAM while you play."
         >
           <Switch
             checked={settings.closeOnLaunch}
@@ -136,8 +136,8 @@ export function MinecraftTab() {
       </SettingsSection>
 
       <SettingsSection
-        title="Diretório da instância"
-        description="Onde ficam os arquivos do modpack, saves, configs e cache."
+        title="Instance directory"
+        description="Where the modpack files, saves, configs, and cache live."
       >
         <div className="flex items-center gap-2">
           <Input
@@ -160,7 +160,7 @@ export function MinecraftTab() {
             }
           >
             <FolderOpen className="size-4" />
-            Abrir
+            Open
           </Button>
         </div>
       </SettingsSection>

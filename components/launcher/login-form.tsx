@@ -42,7 +42,7 @@ export function LoginForm() {
       }
       router.push("/launcher")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao criar conta offline.")
+      setError(e instanceof Error ? e.message : "Could not create the offline account.")
     } finally {
       setBusy(false)
     }
@@ -67,15 +67,15 @@ export function LoginForm() {
             <span className="font-serif text-lg tracking-[0.16em]">AETHERION</span>
           </div>
           <div>
-            <p className="aetherion-kicker text-primary/85!">Reino Etéreo</p>
+            <p className="aetherion-kicker text-primary/85!">Ethereal Realm</p>
             <p className="mt-3 font-serif text-[2rem] leading-[1.15] text-balance text-foreground drop-shadow-[0_8px_24px_rgba(0,0,0,0.7)]">
-              Cruze o veu.
+              Cross the veil.
               <br />
-              <span className="text-primary">Forje sua lenda.</span>
+              <span className="text-primary">Forge your legend.</span>
             </p>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-foreground/70">
-              Entre em modo offline local. Login Microsoft sera conectado depois,
-              com tokens guardados apenas no cofre do sistema.
+              Sign in with a local offline name. Microsoft sign-in comes later,
+              with tokens kept only in the system vault.
             </p>
           </div>
         </div>
@@ -84,16 +84,16 @@ export function LoginForm() {
       <div className="relative col-span-7 flex items-center justify-center bg-background/40 p-10">
         <Link
           href="/launcher"
-          aria-label="Cancelar"
+          aria-label="Cancel"
           className="absolute top-6 right-6 inline-flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-muted-foreground transition hover:text-foreground"
         >
-          <X className="size-4" /> Cancelar
+          <X className="size-4" /> Cancel
         </Link>
 
         <div className="aetherion-rise w-full max-w-sm">
-          <h1 className="font-serif text-3xl tracking-[0.12em] text-foreground">Entrar</h1>
+          <h1 className="font-serif text-3xl tracking-[0.12em] text-foreground">Sign in</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Sua conta fica salva somente neste computador.
+            Your account is saved only on this computer.
           </p>
 
           <Button
@@ -102,7 +102,7 @@ export function LoginForm() {
             onClick={() => {
               const login = window.aetherion?.accounts?.addMicrosoft?.()
               if (!login) {
-                setError("Login Microsoft sera implementado no processo Electron.")
+                setError("Microsoft sign-in will be connected in the Electron process.")
                 return
               }
               login
@@ -111,20 +111,20 @@ export function LoginForm() {
                   setError(
                     e instanceof Error
                       ? e.message
-                      : "Login Microsoft ainda nao esta disponivel neste build.",
+                      : "Microsoft sign-in is not available in this build yet.",
                   ),
                 )
             }}
             className="mt-8 h-11 w-full justify-center gap-3 border-white/10 bg-white/4 hover:bg-white/8"
           >
             <MicrosoftLogo />
-            <span className="text-sm font-medium">Continuar com Microsoft</span>
+            <span className="text-sm font-medium">Continue with Microsoft</span>
           </Button>
 
           <div className="flex items-center gap-4 my-6">
             <Separator className="flex-1 bg-border/60" />
             <span className="aetherion-kicker">
-              ou modo offline
+              or offline mode
             </span>
             <Separator className="flex-1 bg-border/60" />
           </div>
@@ -132,7 +132,7 @@ export function LoginForm() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <Field>
               <FieldLabel htmlFor="username" className="aetherion-kicker">
-                Nome de usuario
+                Username
               </FieldLabel>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -151,7 +151,7 @@ export function LoginForm() {
                 />
               </div>
               <FieldDescription className="text-[11px]">
-                Use 3 a 16 caracteres. Nenhuma senha e pedida ou enviada.
+                Use 3 to 16 characters. No password is asked for or sent.
               </FieldDescription>
             </Field>
 
@@ -167,13 +167,13 @@ export function LoginForm() {
               disabled={busy}
               className="mt-6 h-11 w-full gap-2 bg-primary font-serif tracking-[0.2em] text-primary-foreground hover:bg-primary/90 aetherion-gold-glow aetherion-sheen"
             >
-              {busy ? "SALVANDO..." : "ENTRAR"}
+              {busy ? "SAVING..." : "SIGN IN"}
               <ArrowRight className="size-4" />
             </Button>
           </form>
 
           <p className="mt-8 text-center text-[11px] leading-relaxed text-muted-foreground/80">
-            O Aetherion nao armazena dados de conta em servidores proprios.
+            Aetherion does not store account data on its own servers.
           </p>
         </div>
       </div>

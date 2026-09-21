@@ -9,7 +9,7 @@ import { LAUNCHER_VERSION } from "@/lib/launcher/version"
 import { AetherionMark } from "./aetherion-mark"
 
 const NAV = [
-  { href: "/settings/account", label: "Conta", icon: User },
+  { href: "/settings/account", label: "Account", icon: User },
   { href: "/settings/minecraft", label: "Minecraft", icon: Home },
   { href: "/settings/mods", label: "Mods", icon: Box },
   { href: "/settings/java", label: "Java", icon: Coffee },
@@ -26,7 +26,7 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
           <AetherionMark size={30} />
           <div>
             <p className="font-serif text-base leading-none tracking-[0.14em]">AETHERION</p>
-            <p className="aetherion-kicker mt-2">Configurações</p>
+            <p className="aetherion-kicker mt-2">Settings</p>
           </div>
         </div>
 
@@ -60,7 +60,7 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
             className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm text-muted-foreground transition hover:bg-white/4 hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
-            <span>Voltar</span>
+            <span>Back</span>
           </Link>
           <p className="aetherion-kicker mt-3 px-3">Launcher v{LAUNCHER_VERSION}</p>
         </div>

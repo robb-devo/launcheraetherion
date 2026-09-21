@@ -41,7 +41,7 @@ export function AccountTab() {
       .list()
       .then(setState)
       .catch((e) =>
-        setError(e instanceof Error ? e.message : "Falha ao carregar contas locais."),
+        setError(e instanceof Error ? e.message : "Could not load local accounts."),
       )
   }, [])
 
@@ -62,7 +62,7 @@ export function AccountTab() {
       setUsername("")
       setMode("idle")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao adicionar conta.")
+      setError(e instanceof Error ? e.message : "Could not add the account.")
     } finally {
       setBusy(false)
     }
@@ -80,7 +80,7 @@ export function AccountTab() {
       setState(next)
       if (next.accounts.length === 0) router.replace("/login")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao remover conta.")
+      setError(e instanceof Error ? e.message : "Could not remove the account.")
     }
   }
 
@@ -93,19 +93,19 @@ export function AccountTab() {
         setState((prev) => setActiveAccount(prev, id))
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao selecionar conta.")
+      setError(e instanceof Error ? e.message : "Could not select the account.")
     }
   }
 
   function handleMicrosoftStub() {
     setError(
-      "Login Microsoft exige o processo Electron. Disponível quando o launcher for empacotado (Fase 5).",
+      "Microsoft sign-in needs the Electron process. It is available when the launcher is packaged.",
     )
   }
 
   function handleMicrosoftLogin() {
     if (!window.aetherion?.accounts?.addMicrosoft) {
-      setError("Login Microsoft sera implementado no processo Electron.")
+      setError("Microsoft sign-in will be connected in the Electron process.")
       return
     }
 
@@ -116,7 +116,7 @@ export function AccountTab() {
         setError(
           e instanceof Error
             ? e.message
-            : "Login Microsoft ainda nao esta disponivel neste build.",
+            : "Microsoft sign-in is not available in this build yet.",
         ),
       )
   }
@@ -127,14 +127,14 @@ export function AccountTab() {
       {mode === "idle" && (
         <div className="grid grid-cols-2 gap-3">
           <AddAccountButton
-            label="Conta Microsoft"
-            description="Login oficial com OAuth"
+            label="Microsoft account"
+            description="Official sign-in with OAuth"
             icon={<UserPlus className="size-4" />}
             onClick={handleMicrosoftLogin}
           />
           <AddAccountButton
-            label="Conta Offline"
-            description="Apenas nome de usuário"
+            label="Offline account"
+            description="Username only"
             icon={<Plus className="size-4" />}
             onClick={() => {
               setError(null)
@@ -149,10 +149,10 @@ export function AccountTab() {
         <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-foreground">Nova conta offline</p>
+              <p className="text-sm font-medium text-foreground">New offline account</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                O UUID é gerado deterministicamente a partir do nickname (mesmo
-                algoritmo do Mojang).
+                The UUID is generated from the nickname using the same
+                algorithm Mojang uses for offline players.
               </p>
             </div>
             <Button
@@ -164,7 +164,7 @@ export function AccountTab() {
                 setUsername("")
                 setError(null)
               }}
-              aria-label="Cancelar"
+              aria-label="Cancel"
             >
               <X className="size-4" />
             </Button>
@@ -173,7 +173,7 @@ export function AccountTab() {
           <div className="mt-3 flex gap-2">
             <Input
               autoFocus
-              placeholder="Nome de usuário (3–16 caracteres)"
+              placeholder="Username (3–16 characters)"
               value={username}
               onChange={(e) => {
                 setUsername(e.target.value)
@@ -191,7 +191,7 @@ export function AccountTab() {
               disabled={!username || !!validationError || busy}
               className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              Adicionar
+              Add
             </Button>
           </div>
 
@@ -214,12 +214,12 @@ export function AccountTab() {
       {/* Lista */}
       <div>
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">
-          Contas atuais ({state.accounts.length})
+          Current accounts ({state.accounts.length})
         </p>
         {state.accounts.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/60 p-8 text-center">
             <p className="text-sm text-muted-foreground">
-              Nenhuma conta cadastrada. Adicione uma acima para começar.
+              No accounts yet. Add one above to get started.
             </p>
           </div>
         ) : (
@@ -272,7 +272,7 @@ export function AccountTab() {
                     {active ? (
                       <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 text-primary text-xs">
                         <Check className="size-3" />
-                        Selecionada
+                        Selected
                       </div>
                     ) : (
                       <Button
@@ -281,7 +281,7 @@ export function AccountTab() {
                         onClick={() => handleSelect(acc.id)}
                         className="h-8 text-xs opacity-0 group-hover:opacity-100 transition"
                       >
-                        Selecionar
+                        Select
                       </Button>
                     )}
                     <Button
@@ -289,7 +289,7 @@ export function AccountTab() {
                       variant="ghost"
                       onClick={() => handleRemove(acc.id)}
                       className="size-8 text-muted-foreground hover:text-destructive"
-                      aria-label={`Remover ${acc.username}`}
+                      aria-label={`Remove ${acc.username}`}
                     >
                       <Trash2 className="size-4" />
                     </Button>

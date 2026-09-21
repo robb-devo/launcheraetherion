@@ -15,8 +15,8 @@
     "manifest:publish": "node scripts/build-manifest.mjs --strict --version 0.4 --mc 1.19.2 --forge 43.5.0 --in ./pack-v0.4 --out ./public/manifest.json --owner washryan --repo launcheraetherion",
     "manifest:example": "node scripts/build-manifest.mjs --template --out ./public/manifest.example.json --owner washryan --repo launcheraetherion",
     "manifest:check-urls": "node scripts/check-manifest-urls.mjs ./public/manifest.json",
-    "build:win": "pnpm manifest:publish && pnpm build && electron-builder --win nsis --x64 --publish never",
-    "build:win:ci": "pnpm build && electron-builder --win nsis --x64 --publish never",
+    "build:win": "node scripts/stage-updater-modules.mjs && pnpm manifest:publish && pnpm build && electron-builder --win nsis --x64 --publish never",
+    "build:win:ci": "node scripts/stage-updater-modules.mjs && pnpm build && electron-builder --win nsis --x64 --publish never",
     "release:win": "pnpm build:win && powershell -ExecutionPolicy Bypass -File scripts/publish-windows-release.ps1",
     "modpack:stage": "pnpm manifest:build && node scripts/stage-modpack-release.mjs --manifest ./manifest.json --pack ./pack-v0.4 --out ./release-v0.4-upload",
     "release:modpack": "pnpm modpack:stage && powershell -ExecutionPolicy Bypass -File scripts/publish-modpack-release.ps1 -AssetsPath ./release-v0.4-upload/assets",
@@ -38,6 +38,12 @@
       "package.json"
     ],
     "asar": true,
+    "publish": {
+      "provider": "github",
+      "owner": "washryan",
+      "repo": "launcheraetherion",
+      "releaseType": "release"
+    },
     "win": {
       "icon": "build/icon.ico",
       "target": [
@@ -93,6 +99,7 @@
     "clsx": "^2.1.1",
     "cmdk": "1.1.1",
     "date-fns": "4.1.0",
+    "electron-updater": "6.6.2",
     "embla-carousel-react": "8.6.0",
     "input-otp": "1.4.2",
     "lucide-react": "^0.564.0",

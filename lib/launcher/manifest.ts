@@ -37,7 +37,7 @@ export async function fetchManifest(
     redirect: "follow",
   })
   if (!res.ok) {
-    throw new Error(`Falha ao buscar manifest (${res.status} ${res.statusText})`)
+    throw new Error(`Could not fetch the manifest (${res.status} ${res.statusText})`)
   }
 
   const json = (await res.json()) as Manifest
@@ -46,17 +46,17 @@ export async function fetchManifest(
 }
 
 export function validateManifest(m: Manifest): void {
-  if (!m.version) throw new Error("Manifest inválido: campo 'version' ausente.")
-  if (!m.minecraft) throw new Error("Manifest inválido: campo 'minecraft' ausente.")
+  if (!m.version) throw new Error("Invalid manifest: missing 'version'.")
+  if (!m.minecraft) throw new Error("Invalid manifest: missing 'minecraft'.")
   if (!m.forge?.url || !m.forge?.sha256) {
-    throw new Error("Manifest inválido: bloco 'forge' incompleto.")
+    throw new Error("Invalid manifest: incomplete 'forge' block.")
   }
   if (!Array.isArray(m.files)) {
-    throw new Error("Manifest inválido: 'files' deve ser um array.")
+    throw new Error("Invalid manifest: 'files' must be an array.")
   }
   for (const f of m.files) {
     if (!f.path || !f.url || !f.sha256 || typeof f.size !== "number") {
-      throw new Error(`Manifest inválido: file '${f.path}' com campos ausentes.`)
+      throw new Error(`Invalid manifest: file '${f.path}' is incomplete.`)
     }
   }
 }
