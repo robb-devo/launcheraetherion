@@ -17,6 +17,10 @@ import { publicAssetPath } from "@/lib/public-path"
 
 const WINDOWS_INSTALLER_FILENAME = `Aetherion.Launcher.Setup.${LAUNCHER_VERSION}.exe`
 const LAUNCHER_REPO = {
+  owner: "robb-devo",
+  repo: "launcheraetherion",
+}
+const MODPACK_REPO = {
   owner: "washryan",
   repo: "launcheraetherion",
 }
@@ -27,7 +31,7 @@ const WINDOWS_DOWNLOAD_URL = launcherDownloadUrl(
   LAUNCHER_REPO,
 )
 const LAUNCHER_RELEASE_URL = releasePageUrl(LAUNCHER_VERSION, LAUNCHER_REPO)
-const MODPACK_RELEASE_URL = releasePageUrl(MOCK_MANIFEST.version, LAUNCHER_REPO)
+const MODPACK_RELEASE_URL = releasePageUrl(MOCK_MANIFEST.version, MODPACK_REPO)
 const REQUIRED_MODS = MOCK_MANIFEST.files.filter((file) => file.type === "required")
 const OPTIONAL_MODS = MOCK_MANIFEST.files.filter((file) => file.type === "optional")
 const FEATURED_MODS = REQUIRED_MODS.slice(0, 12)

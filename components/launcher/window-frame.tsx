@@ -5,7 +5,6 @@ import type React from "react"
 import { Minus, Square, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AetherionMark } from "./aetherion-mark"
-import { LauncherUpdateNotice } from "./launcher-update"
 
 /**
  * WindowFrame — simula a chrome de uma janela desktop.
@@ -83,7 +82,6 @@ export function WindowFrame({
 
         {/* Conteúdo */}
         <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
-        <LauncherUpdateNotice />
       </div>
     </div>
   )
