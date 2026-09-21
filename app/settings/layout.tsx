@@ -4,7 +4,7 @@ import { WindowFrame } from "@/components/launcher/window-frame"
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <WindowFrame title="Aetherion Launcher • Configurações">
+    <WindowFrame title="Aetherion Launcher • Settings">
       <SettingsShell>{children}</SettingsShell>
     </WindowFrame>
   )

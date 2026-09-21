@@ -11,7 +11,7 @@ pelo main process do Electron (Fase 5).
 Arquivos: `app/*`, `components/launcher/*`, `components/settings/*`.
 
 - Janela desktop simulada com title bar custom (`WindowFrame`).
-- Dashboard com arte de fundo, status do servidor, badge da conta e botão JOGAR.
+- Dashboard com arte de fundo, status do servidor, badge da conta e botão PLAY.
 - Login com Microsoft OAuth + modo offline.
 - Settings com 5 abas (Conta / Minecraft / Mods / Java / Launcher).
 - Design tokens: dourado aetheriano + ciano místico sobre grafite.
@@ -194,7 +194,7 @@ Opções:
 
 ### Múltiplos servidores
 Manifest vira um `modpacks.json` com array de instâncias. UI ganha um seletor
-acima do botão JOGAR. Cada instância tem seu próprio `instance-state.json`.
+acima do botão PLAY. Cada instância tem seu próprio `instance-state.json`.
 
 ### Status ao vivo
 `node-minecraft-protocol` em 1 IPC que pinga o servidor a cada 30s e envia

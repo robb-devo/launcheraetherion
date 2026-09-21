@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Cog, Disc, Globe, LogIn, Play, Youtube } from "lucide-react"
+import { Cog, Globe, LogIn, Play, Youtube } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -18,6 +18,7 @@ import {
 import { simulateLaunch } from "@/lib/launcher/launch-simulator"
 import type { Account, LauncherSettings, LaunchProgress } from "@/lib/launcher/types"
 import { publicAssetPath } from "@/lib/public-path"
+import { LAUNCHER_VERSION } from "@/lib/launcher/version"
 import { AetherionMark } from "./aetherion-mark"
 import { LaunchProgressOverlay } from "./launch-progress"
 
@@ -65,7 +66,7 @@ export function Dashboard() {
       return
     }
     abortRef.current = controller
-    setProgress({ phase: "fetching-manifest", message: "Iniciando..." })
+    setProgress({ phase: "fetching-manifest", message: "Starting..." })
 
     try {
       if (window.aetherion?.launch) {
@@ -101,7 +102,7 @@ export function Dashboard() {
       }
       setProgress({
         phase: "error",
-        message: "Falha na preparação",
+        message: "Preparation failed",
         error: err instanceof Error ? err.message : String(err),
       })
     }
@@ -116,23 +117,34 @@ export function Dashboard() {
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      {/* Arte de fundo */}
+    <div className="relative h-full w-full overflow-hidden bg-background">
       <div className="absolute inset-0">
-        <Image src={publicAssetPath("/aetherion-bg.jpg")} alt="" fill priority className="object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/40 to-background/95" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-background/80" />
+        <Image
+          src={publicAssetPath("/aetherion-bg.jpg")}
+          alt=""
+          fill
+          priority
+          className="object-cover object-[center_42%] scale-[1.03]"
+        />
+        <div className="absolute inset-0 aetherion-scrim" />
+        <div className="absolute inset-0 aetherion-vignette" />
+        <div className="pointer-events-none absolute inset-0 aetherion-atmosphere" />
       </div>
 
-      {/* Conteúdo */}
-      <div className="relative h-full flex flex-col">
-        <div className="flex items-start justify-between p-8">
-          <div className="flex items-center gap-3">
-            <AetherionMark size={48} />
+      <div className="relative flex h-full flex-col">
+        <header className="flex items-start justify-between gap-6 px-8 pt-7 aetherion-rise">
+          <div className="flex items-center gap-3.5">
+            <AetherionMark size={46} />
             <div>
-              <h1 className="font-serif text-2xl tracking-wide text-foreground">Aetherion</h1>
-              <p className="text-xs text-muted-foreground tracking-[0.2em] uppercase">
-                Reino Etéreo
+              <h1 className="font-serif text-[1.7rem] leading-none tracking-[0.16em] text-foreground">
+                AETHERION
+              </h1>
+              <p className="mt-2 flex items-center gap-2">
+                <span className="aetherion-kicker text-primary/85!">Ethereal Realm</span>
+                <span className="text-muted-foreground/40" aria-hidden>
+                  ·
+                </span>
+                <span className="aetherion-kicker">v{LAUNCHER_VERSION}</span>
               </p>
             </div>
           </div>
@@ -144,47 +156,52 @@ export function Dashboard() {
               type={activeAccount.type}
             />
           ) : (
-            <Button asChild variant="outline" className="bg-card/60">
-              <Link href="/login">Entrar</Link>
+            <Button asChild variant="outline" className="h-11 border-white/10 bg-background/50 px-5 backdrop-blur-md">
+              <Link href="/login">Sign in</Link>
             </Button>
           )}
-        </div>
+        </header>
 
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <p className="font-serif text-6xl tracking-[0.15em] text-foreground/90 drop-shadow-2xl">
+        <div className="flex flex-1 items-end px-8 pb-5">
+          <div className="aetherion-rise max-w-md" style={{ animationDelay: "80ms" }}>
+            <p className="aetherion-kicker text-primary/90!">Main Realm</p>
+            <p className="mt-3 font-serif text-5xl leading-none tracking-[0.18em] text-foreground drop-shadow-[0_10px_28px_rgba(0,0,0,0.72)]">
               AETHERION
             </p>
-            <p className="mt-2 text-sm text-primary/80 tracking-[0.4em] uppercase font-medium">
-              Main Realm
+            <p className="mt-3 text-sm text-foreground/70">
+              {MOCK_MANIFEST.minecraft} · Forge {MOCK_MANIFEST.forge.version}
             </p>
           </div>
         </div>
 
-        <footer className="border-t border-border/50 bg-background/60 backdrop-blur-xl">
-          <div className="grid grid-cols-12 gap-6 items-center px-8 py-5">
-            <div className="col-span-5 flex items-center gap-8">
+        <footer className="px-6 pb-6">
+          <div className="aetherion-dock grid grid-cols-12 items-center gap-5 rounded-2xl px-5 py-4">
+            <div className="col-span-5 flex items-center gap-6">
               <StatusBlock
-                label="Jogadores"
+                label="Players"
                 value={`${MOCK_SERVER_STATUS.players.current} / ${MOCK_SERVER_STATUS.players.max}`}
-                dotClass="bg-primary"
+                dotClass="bg-primary text-primary"
               />
+              <span className="hidden h-8 w-px bg-white/10 sm:block" aria-hidden />
               <StatusBlock
                 label="Mojang"
-                value={MOCK_MOJANG_STATUS.auth === "green" ? "Online" : "Instável"}
+                value={MOCK_MOJANG_STATUS.auth === "green" ? "Online" : "Unstable"}
                 dotClass={
-                  MOCK_MOJANG_STATUS.auth === "green" ? "bg-primary" : "bg-destructive"
+                  MOCK_MOJANG_STATUS.auth === "green"
+                    ? "bg-primary text-primary"
+                    : "bg-destructive text-destructive"
                 }
               />
+              <span className="hidden h-8 w-px bg-white/10 sm:block" aria-hidden />
               <StatusBlock
                 label="Ping"
                 value={`${MOCK_SERVER_STATUS.ping ?? "--"} ms`}
-                dotClass="bg-accent"
+                dotClass="bg-magic text-magic"
               />
             </div>
 
             <div className="col-span-3 flex items-center justify-center gap-2">
-              <IconLink href="/settings/account" label="Configurações">
+              <IconLink href="/settings/account" label="Settings">
                 <Cog className="size-4" />
               </IconLink>
               <IconLink href="#" label="Site">
@@ -194,20 +211,18 @@ export function Dashboard() {
                 <Youtube className="size-4" />
               </IconLink>
               <IconLink href="#" label="Discord">
-                <Disc className="size-4" />
+                <DiscordMark />
               </IconLink>
             </div>
 
             <div className="col-span-4 flex items-center justify-end gap-4">
               <div className="text-right">
-                <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                  Instância
+                <p className="aetherion-kicker">Instance</p>
+                <p className="mt-1 text-sm font-medium text-foreground">
+                  {MOCK_MANIFEST.name}
                 </p>
-                <p className="text-sm font-medium text-foreground">
-                  {MOCK_MANIFEST.name}{" "}
-                  <span className="text-muted-foreground font-normal">
-                    • {MOCK_MANIFEST.minecraft} • v{MOCK_MANIFEST.version}
-                  </span>
+                <p className="text-xs text-muted-foreground">
+                  {MOCK_MANIFEST.minecraft} · v{MOCK_MANIFEST.version}
                 </p>
               </div>
 
@@ -216,14 +231,14 @@ export function Dashboard() {
                 onClick={handleLaunch}
                 disabled={progress !== null && progress.phase !== "error" && progress.phase !== "running"}
                 className={cn(
-                  "h-14 px-8 rounded-md font-serif text-lg tracking-[0.25em]",
-                  "bg-primary text-primary-foreground hover:bg-primary/90",
-                  "aetherion-gold-glow",
+                  "h-14 min-w-[168px] rounded-xl px-7 font-serif text-base tracking-[0.22em]",
+                  "bg-primary text-primary-foreground hover:bg-primary/92",
+                  "aetherion-gold-glow aetherion-sheen",
                 )}
               >
-                <span className="inline-flex items-center gap-3">
+                <span className="inline-flex items-center gap-2.5">
                   <Play className="size-4 fill-primary-foreground" />
-                  JOGAR
+                  PLAY
                 </span>
               </Button>
             </div>
@@ -253,10 +268,10 @@ function StatusBlock({
 }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">{label}</p>
-      <div className="mt-1 flex items-center gap-2">
-        <span className={cn("size-1.5 rounded-full", dotClass)} />
-        <span className="text-sm font-medium text-foreground">{value}</span>
+      <p className="aetherion-kicker">{label}</p>
+      <div className="mt-1.5 flex items-center gap-2">
+        <span className={cn("size-1.5 rounded-full aetherion-live", dotClass)} />
+        <span className="text-sm font-medium tracking-wide text-foreground">{value}</span>
       </div>
     </div>
   )
@@ -275,7 +290,7 @@ function IconLink({
     <Link
       href={href}
       aria-label={label}
-      className="size-9 inline-flex items-center justify-center rounded-md border border-border/60 bg-card/50 text-muted-foreground hover:text-primary hover:border-primary/40 transition"
+      className="inline-flex size-9 items-center justify-center rounded-lg border border-white/10 bg-white/4 text-muted-foreground transition duration-200 hover:-translate-y-px hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
     >
       {children}
     </Link>
@@ -292,26 +307,37 @@ function AccountBadge({
   type: "offline" | "microsoft"
 }) {
   return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded-md border border-border/60 bg-card/60 backdrop-blur-md">
+    <div className="aetherion-glass flex items-center gap-3 rounded-xl px-3 py-2">
       <div className="text-right">
-        <p className="text-sm font-medium text-foreground leading-tight">{username}</p>
-        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <p className="text-sm font-medium leading-tight text-foreground">{username}</p>
+        <p className="aetherion-kicker mt-1">
           {type === "microsoft" ? "Microsoft" : "Offline"}
         </p>
       </div>
-      <Avatar className="size-10 rounded-md ring-1 ring-primary/30">
+      <Avatar className="size-10 rounded-lg ring-1 ring-primary/40">
         <AvatarImage src={publicAssetPath(avatarUrl || "/placeholder.svg")} alt={username} />
-        <AvatarFallback className="rounded-md bg-muted text-primary">
+        <AvatarFallback className="rounded-lg bg-muted text-primary">
           {username.slice(0, 2).toUpperCase()}
         </AvatarFallback>
       </Avatar>
       <Link
         href="/login"
-        aria-label="Trocar conta"
-        className="ml-1 size-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-primary transition"
+        aria-label="Switch account"
+        className="ml-0.5 inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-white/6 hover:text-primary"
       >
         <LogIn className="size-4" />
       </Link>
     </div>
+  )
+}
+
+function DiscordMark() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M19.27 5.33A17.4 17.4 0 0 0 15.09 4l-.4.73a16.1 16.1 0 0 1 4.08 1.27 16.6 16.6 0 0 0-13.54 0A16.4 16.4 0 0 1 9.3 4.73L8.91 4a17.4 17.4 0 0 0-4.18 1.33C2.2 9.02 1.5 12.6 1.85 16.13A17.6 17.6 0 0 0 7.1 18.7l.82-1.12a11.5 11.5 0 0 1-1.82-.87l.45-.35c3.52 1.63 7.34 1.63 10.8 0l.46.35c-.58.35-1.19.64-1.82.87l.82 1.12a17.5 17.5 0 0 0 5.25-2.57c.5-4.06-.72-7.6-2.79-10.8ZM8.68 14.3c-1.05 0-1.92-.98-1.92-2.17 0-1.2.85-2.18 1.92-2.18 1.08 0 1.94.99 1.92 2.18 0 1.19-.85 2.17-1.92 2.17Zm6.64 0c-1.05 0-1.92-.98-1.92-2.17 0-1.2.85-2.18 1.92-2.18 1.08 0 1.94.99 1.92 2.18 0 1.19-.84 2.17-1.92 2.17Z"
+      />
+    </svg>
   )
 }

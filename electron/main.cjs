@@ -11,7 +11,7 @@ const zlib = require("node:zlib")
 const isDev = !app.isPackaged
 const USERNAME_REGEX = /^[A-Za-z0-9_]{3,16}$/
 const LAUNCHER_NAME = "AetherionLauncher"
-const LAUNCHER_VERSION = "0.3.0"
+const LAUNCHER_VERSION = require("../package.json").version
 const MOJANG_VERSION_MANIFEST =
   "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 const MINECRAFT_RESOURCES_BASE = "https://resources.download.minecraft.net"
@@ -94,7 +94,7 @@ function createWindow() {
     minHeight: 700,
     frame: false,
     titleBarStyle: "hidden",
-    backgroundColor: "#0a0905",
+    backgroundColor: "#121018",
     icon: appIconPath(),
     show: false,
     webPreferences: {
@@ -131,7 +131,7 @@ function registerStaticAppProtocol() {
     if (!pathname || pathname === "/") pathname = "/launcher/"
     const filePath = resolveStaticAppPath(outRoot, pathname)
     if (!filePath || !fsSync.existsSync(filePath)) {
-      return new Response("Arquivo nao encontrado.", { status: 404 })
+      return new Response("File not found.", { status: 404 })
     }
 
     const data = await fs.readFile(filePath)
@@ -204,9 +204,26 @@ function appIconPath() {
   return fsSync.existsSync(iconPath) ? iconPath : undefined
 }
 
+const { createLauncherUpdater } = require("./updater.cjs")
+let launcherUpdater = null
+
 app.whenReady().then(async () => {
   if (!isDev) registerStaticAppProtocol()
   createWindow()
+  launcherUpdater = createLauncherUpdater({
+    getWindow: () => mainWindow,
+    isDev,
+    shouldDeferRestart: () =>
+      Boolean(activeLaunchAbort) ||
+      Boolean(
+        activeMinecraftProcess &&
+          !activeMinecraftDetached &&
+          !activeMinecraftProcess.killed,
+      ),
+  })
+  launcherUpdater.check(true).catch((error) => {
+    console.warn("[aetherion] update check failed", error)
+  })
 })
 
 app.on("window-all-closed", () => {
@@ -215,6 +232,12 @@ app.on("window-all-closed", () => {
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow()
+})
+
+app.on("browser-window-focus", () => {
+  launcherUpdater?.check(false).catch((error) => {
+    console.warn("[aetherion] update check failed", error)
+  })
 })
 
 app.on("before-quit", () => {
@@ -230,6 +253,10 @@ ipcMain.on("window:maximize", () => {
 })
 ipcMain.on("window:close", () => mainWindow?.close())
 
+ipcMain.handle("updater:getState", () => launcherUpdater?.snapshot() ?? { status: "idle" })
+ipcMain.handle("updater:check", () => launcherUpdater?.check(true) ?? { status: "idle" })
+ipcMain.handle("updater:install", () => launcherUpdater?.install() ?? { ok: false })
+
 ipcMain.handle("accounts:list", () => readAccountsState())
 ipcMain.handle("accounts:addOffline", async (_event, username) => {
   const state = await readAccountsState()
@@ -240,7 +267,7 @@ ipcMain.handle("accounts:addOffline", async (_event, username) => {
       candidate.username.toLowerCase() === account.username.toLowerCase(),
   )
 
-  if (existing) throw new Error("Essa conta offline ja foi adicionada.")
+  if (existing) throw new Error("That offline account is already added.")
 
   const next = {
     activeId: state.activeId ?? account.id,
@@ -260,7 +287,7 @@ ipcMain.handle("accounts:remove", async (_event, id) => {
 ipcMain.handle("accounts:setActive", async (_event, id) => {
   const state = await readAccountsState()
   if (!state.accounts.some((account) => account.id === id)) {
-    throw new Error("Conta nao encontrada.")
+    throw new Error("Account not found.")
   }
 
   const next = { ...state, activeId: id }
@@ -270,7 +297,7 @@ ipcMain.handle("accounts:setActive", async (_event, id) => {
 ipcMain.handle("accounts:getDataPath", () => accountsPath())
 
 ipcMain.handle("accounts:addMicrosoft", () => {
-  throw new Error("Login Microsoft ainda nao foi implementado neste build.")
+  throw new Error("Microsoft sign-in is not available in this build yet.")
 })
 
 ipcMain.handle("settings:get", () => readLauncherSettings())
@@ -304,7 +331,7 @@ ipcMain.handle("java:detect", async () => {
 })
 ipcMain.handle("java:chooseExecutable", async () => {
   const result = await dialog.showOpenDialog(mainWindow || undefined, {
-    title: "Escolher Java",
+    title: "Choose Java",
     properties: ["openFile"],
     filters:
       process.platform === "win32"
@@ -315,7 +342,7 @@ ipcMain.handle("java:chooseExecutable", async () => {
 
   const java = await inspectJava(result.filePaths[0])
   if (!java || java.major < 17) {
-    throw new Error("Selecione um Java 17 ou superior.")
+    throw new Error("Choose Java 17 or newer.")
   }
 
   const settings = await readLauncherSettings()
@@ -337,7 +364,7 @@ ipcMain.handle("mods:listDropins", async () => {
 ipcMain.handle("mods:addDropins", async () => {
   const root = await currentInstanceRoot()
   const result = await dialog.showOpenDialog(mainWindow || undefined, {
-    title: "Adicionar drop-in mod",
+    title: "Add drop-in mod",
     properties: ["openFile", "multiSelections"],
     filters: [{ name: "Minecraft mods", extensions: ["jar"] }],
   })
@@ -357,7 +384,7 @@ ipcMain.handle("mods:addDropins", async () => {
 ipcMain.handle("mods:setOptional", async (_event, payload) => {
   const root = await currentInstanceRoot()
   const filePath = String(payload?.path || "")
-  if (!filePath.startsWith("mods/")) throw new Error("Mod opcional invalido.")
+  if (!filePath.startsWith("mods/")) throw new Error("Invalid optional mod.")
 
   const state = await readInstanceState(
     root,
@@ -482,8 +509,8 @@ ipcMain.handle("launch:start", async (_event, args) => {
     if (controller.signal.aborted) {
       emitLaunchProgress({
         phase: "error",
-        message: "Atualizacao cancelada.",
-        error: "Cancelado pelo usuario.",
+        message: "Update cancelled.",
+        error: "Cancelled.",
       })
       return { ok: false, cancelled: true }
     }
@@ -491,7 +518,7 @@ ipcMain.handle("launch:start", async (_event, args) => {
     const message = error instanceof Error ? error.message : String(error)
     emitLaunchProgress({
       phase: "error",
-      message: "Falha na atualizacao.",
+      message: "Update failed.",
       error: message,
     })
     throw error
@@ -510,9 +537,9 @@ ipcMain.handle("launch:cancel", () => {
 
 function validateOfflineUsername(username) {
   const trimmed = String(username ?? "").trim()
-  if (!trimmed) return "Informe um nome de usuario."
+  if (!trimmed) return "Enter a username."
   if (!USERNAME_REGEX.test(trimmed)) {
-    return "Use 3 a 16 caracteres: letras, numeros ou underline."
+    return "Use 3 to 16 characters: letters, numbers, or underscore."
   }
   return null
 }
@@ -724,7 +751,7 @@ async function runUpdater(args, signal) {
 
   emitLaunchProgress({
     phase: "fetching-manifest",
-    message: `Buscando manifest (${LAUNCH_TARGET.minecraft} + Forge ${LAUNCH_TARGET.forge})...`,
+    message: `Fetching manifest (${LAUNCH_TARGET.minecraft} + Forge ${LAUNCH_TARGET.forge})...`,
   })
 
   const manifest = await loadManifest(settings, signal)
@@ -736,7 +763,7 @@ async function runUpdater(args, signal) {
 
   emitLaunchProgress({
     phase: "computing-plan",
-    message: `Escaneando instancia local em ${root}`,
+    message: `Scanning the local instance at ${root}`,
   })
 
   let [localState, installedHashes] = await Promise.all([
@@ -754,7 +781,7 @@ async function runUpdater(args, signal) {
   if (plan.downloadCount === 0 && plan.removeCount === 0) {
     emitLaunchProgress({
       phase: "verifying",
-      message: `Tudo atualizado: ${manifest.minecraft} + Forge ${manifest.forge.version}`,
+      message: `Up to date: ${manifest.minecraft} + Forge ${manifest.forge.version}`,
       totalBytes: 0,
       loadedBytes: 0,
       filesDone: 0,
@@ -789,14 +816,14 @@ async function runUpdater(args, signal) {
   const finalLaunchPlan = await buildMinecraftLaunchPlan(root, manifest, launchArgs, signal)
   if (!finalLaunchPlan.ready) {
     throw new Error(
-      `Ainda faltam ${finalLaunchPlan.missing.length} arquivo(s) para iniciar. Primeiro: ${finalLaunchPlan.missing[0]}`,
+      `Still missing ${finalLaunchPlan.missing.length} file(s) before launch. First missing: ${finalLaunchPlan.missing[0]}`,
     )
   }
   const processInfo = await startMinecraft(finalLaunchPlan, signal)
 
   emitLaunchProgress({
     phase: "running",
-    message: `Minecraft iniciado (PID ${processInfo.pid}).`,
+    message: `Minecraft started (PID ${processInfo.pid}).`,
     totalBytes: plan.totalBytes,
     loadedBytes: plan.totalBytes,
     filesDone: plan.downloadCount,
@@ -832,7 +859,7 @@ function normalizeLaunchArgs(args, settings) {
 async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
   emitLaunchProgress({
     phase: "launching",
-    message: "Montando LaunchPlan do Minecraft/Forge...",
+    message: "Building the Minecraft/Forge launch plan...",
   })
 
   const profileId =
@@ -843,7 +870,7 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
   const parentProfile = await ensureMinecraftVersionJson(root, parentId, signal)
   const merged = mergeVersionProfiles(parentProfile, forgeProfile)
   if (!merged.mainClass) {
-    throw new Error(`Perfil ${profileId} nao informa mainClass para iniciar o Minecraft.`)
+    throw new Error(`Profile ${profileId} does not include a mainClass, so Minecraft cannot start.`)
   }
   const account = await getLaunchAccount(args?.accountId)
   const java = await resolveJavaForSettings(
@@ -854,7 +881,7 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
 
   if (!java) {
     throw new Error(
-      "Java 17 nao encontrado. Instale o Eclipse Temurin/OpenJDK 17 ou configure JAVA_HOME.",
+      "Java 17 was not found. Install Eclipse Temurin/OpenJDK 17 or set JAVA_HOME.",
     )
   }
 
@@ -953,8 +980,8 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
   emitLaunchProgress({
     phase: "launching",
     message: launchPlan.ready
-      ? `LaunchPlan pronto: ${profileId} com ${libraryPlan.classpath.length} bibliotecas.`
-      : `LaunchPlan pronto; faltam ${missing.length} arquivo(s) antes do spawn.`,
+      ? `Ready to launch ${profileId} with ${libraryPlan.classpath.length} libraries.`
+      : `Launch plan ready; ${missing.length} file(s) are still missing before spawn.`,
   })
 
   return launchPlan
@@ -988,7 +1015,7 @@ function summarizeLaunchPlan(plan) {
 async function startMinecraft(launchPlan, signal) {
   throwIfAborted(signal)
   if (activeMinecraftProcess && !activeMinecraftProcess.killed) {
-    throw new Error("Minecraft ja esta em execucao.")
+    throw new Error("Minecraft is already running.")
   }
 
   await fs.mkdir(path.join(launchPlan.root, "logs"), { recursive: true })
@@ -997,7 +1024,7 @@ async function startMinecraft(launchPlan, signal) {
 
   emitLaunchProgress({
     phase: "launching",
-    message: "Abrindo Minecraft...",
+    message: "Starting Minecraft...",
   })
 
   console.log("[aetherion] starting minecraft", {
@@ -1074,7 +1101,7 @@ async function startMinecraft(launchPlan, signal) {
       if (code !== 0) {
         emitLaunchProgress({
           phase: "error",
-          message: "Minecraft fechou com erro.",
+          message: "Minecraft closed with an error.",
           error: diagnostics.message,
         })
       }
@@ -1092,29 +1119,29 @@ async function minecraftExitDiagnostics(root, logPath, code) {
 
   if (/java version 2[1-9]\./i.test(logTail)) {
     hints.push(
-      "Java 21 detectado. Para Minecraft 1.19.2/Forge, use Java 17 em Configuracoes > Java.",
+      "Java 21 detected. For Minecraft 1.19.2 with Forge, use Java 17 in Settings > Java.",
     )
   }
   if (/OptiFineTransformationService|OptiFineTransformer/i.test(logTail)) {
-    hints.push("OptiFine estava ativo. Para testar estabilidade, desative OptiFine em Mods opcionais.")
+    hints.push("OptiFine was enabled. Turn OptiFine off under optional mods to test stability.")
   }
   if (
     /aether\.mixins\.json:client\.optifine|BossHealthOverlayMixin/i.test(logTail) ||
     /aether\.mixins\.json:client\.optifine|BossHealthOverlayMixin/i.test(crashTail)
   ) {
     hints.push(
-      "Conflito detectado entre Aether e OptiFine. Mantenha JEI e Xaero ativos se quiser, mas desative o OptiFine para abrir este modpack.",
+      "Aether conflicts with OptiFine. JEI and Xaero can stay on, but turn OptiFine off to launch this modpack.",
     )
   }
   if (/HTTP\s+404|Not Found em https?:\/\//i.test(logTail)) {
-    hints.push("Foi detectado 404 no log; rode Verificar integridade para baixar novamente.")
+    hints.push("A 404 was found in the log. Run Verify integrity to download the files again.")
   }
 
-  const parts = [`Minecraft fechou cedo com codigo ${code}.`]
+  const parts = [`Minecraft exited early with code ${code}.`]
   if (crashReport) parts.push(`Crash report: ${crashReport}`)
   parts.push(`Log: ${logPath}`)
-  if (hints.length) parts.push(`Possivel causa: ${hints.join(" ")}`)
-  if (logTail) parts.push(`Ultimas linhas:\n${logTail}`)
+  if (hints.length) parts.push(`Possible cause: ${hints.join(" ")}`)
+  if (logTail) parts.push(`Last lines:\n${logTail}`)
 
   return { message: parts.join("\n\n"), crashReport, logPath, logTail }
 }
@@ -1268,7 +1295,7 @@ function readNbtPayload(buffer, cursor, type) {
       return value
     }
     default:
-      throw new Error(`NBT tag nao suportada: ${type}`)
+      throw new Error(`Unsupported NBT tag: ${type}`)
   }
 }
 
@@ -1320,7 +1347,7 @@ function writeNbtPayload(type, value) {
     case 12:
       return Buffer.concat([writeInt32(value?.length || 0), ...(value || []).map(writeBigInt64)])
     default:
-      throw new Error(`NBT tag nao suportada: ${type}`)
+      throw new Error(`Unsupported NBT tag: ${type}`)
   }
 }
 
@@ -1445,7 +1472,7 @@ async function prepareMinecraftRuntime(root, launchPlan, signal) {
   }
 
   const firstBatch = [...libraryDownloads, ...indexDownloads]
-  await downloadRuntimeArtifacts(firstBatch, signal, "Baixando bibliotecas e indice de assets")
+  await downloadRuntimeArtifacts(firstBatch, signal, "Downloading libraries and the asset index")
 
   const assetIndex = await readJsonFile(launchPlan.assetIndex.path)
   const assetDownloads = []
@@ -1457,7 +1484,7 @@ async function prepareMinecraftRuntime(root, launchPlan, signal) {
     }
   }
 
-  await downloadRuntimeArtifacts(assetDownloads, signal, "Baixando assets do Minecraft")
+  await downloadRuntimeArtifacts(assetDownloads, signal, "Downloading Minecraft assets")
   await ensureNativesExtracted(launchPlan, signal)
 }
 
@@ -1482,7 +1509,7 @@ async function downloadRuntimeArtifacts(artifacts, signal, label) {
       loadedBytes += delta
       emitLaunchProgress({
         phase: "downloading-files",
-        message: `Baixando ${artifact.label || displayName(artifact.path)}...`,
+        message: `Downloading ${artifact.label || displayName(artifact.path)}...`,
         totalBytes,
         loadedBytes,
         filesDone,
@@ -1492,7 +1519,7 @@ async function downloadRuntimeArtifacts(artifacts, signal, label) {
     filesDone++
     emitLaunchProgress({
       phase: "downloading-files",
-      message: `${artifact.label || displayName(artifact.path)} concluido.`,
+      message: `${artifact.label || displayName(artifact.path)} complete.`,
       totalBytes,
       loadedBytes,
       filesDone,
@@ -1515,7 +1542,7 @@ async function downloadArtifactWithRetry(artifact, signal, onBytes) {
 }
 
 async function downloadArtifact(artifact, signal, onBytes) {
-  if (!artifact.url) throw new Error(`Artefato sem URL: ${artifact.label || artifact.path}`)
+  if (!artifact.url) throw new Error(`Artifact is missing a URL: ${artifact.label || artifact.path}`)
 
   const temp = `${artifact.path}.download`
   await fs.mkdir(path.dirname(artifact.path), { recursive: true })
@@ -1546,7 +1573,7 @@ async function ensureNativesExtracted(launchPlan, signal) {
 
   emitLaunchProgress({
     phase: "verifying",
-    message: "Extraindo natives do Minecraft...",
+    message: "Extracting Minecraft natives...",
   })
 
   await fs.rm(launchPlan.nativesDirectory, { recursive: true, force: true })
@@ -1582,7 +1609,7 @@ async function extractZipToDirectory(zipPath, targetDir, excludes, signal) {
 
 function readZipCentralDirectory(buffer) {
   const endOffset = findZipEndOfCentralDirectory(buffer)
-  if (endOffset < 0) throw new Error("Arquivo ZIP invalido: EOCD nao encontrado.")
+  if (endOffset < 0) throw new Error("Invalid ZIP file: end of central directory was not found.")
 
   const centralSize = buffer.readUInt32LE(endOffset + 12)
   const centralOffset = buffer.readUInt32LE(endOffset + 16)
@@ -1592,7 +1619,7 @@ function readZipCentralDirectory(buffer) {
 
   while (offset < end) {
     if (buffer.readUInt32LE(offset) !== 0x02014b50) {
-      throw new Error("Arquivo ZIP invalido: central directory corrompido.")
+      throw new Error("Invalid ZIP file: central directory is corrupt.")
     }
 
     const flags = buffer.readUInt16LE(offset + 8)
@@ -1631,7 +1658,7 @@ function findZipEndOfCentralDirectory(buffer) {
 function inflateZipEntry(buffer, entry) {
   const offset = entry.localHeaderOffset
   if (buffer.readUInt32LE(offset) !== 0x04034b50) {
-    throw new Error(`Arquivo ZIP invalido: header local ausente em ${entry.name}`)
+    throw new Error(`Invalid ZIP file: local header is missing for ${entry.name}`)
   }
 
   const filenameLength = buffer.readUInt16LE(offset + 26)
@@ -1641,7 +1668,7 @@ function inflateZipEntry(buffer, entry) {
 
   if (entry.method === 0) return Buffer.from(compressed)
   if (entry.method === 8) return zlib.inflateRawSync(compressed)
-  throw new Error(`Metodo ZIP nao suportado (${entry.method}) em ${entry.name}`)
+  throw new Error(`Unsupported ZIP method (${entry.method}) for ${entry.name}`)
 }
 
 function shouldExtractZipEntry(entryName, excludes) {
@@ -1658,7 +1685,7 @@ async function getLaunchAccount(accountId) {
     state.accounts.find((candidate) => candidate.id === state.activeId)
 
   if (!account) {
-    throw new Error("Nenhuma conta local ativa encontrada para iniciar o Minecraft.")
+    throw new Error("No active local account was found, so Minecraft cannot start.")
   }
 
   return account
@@ -1670,13 +1697,13 @@ async function ensureMinecraftVersionJson(root, versionId, signal) {
 
   emitLaunchProgress({
     phase: "fetching-manifest",
-    message: `Baixando metadados vanilla ${versionId} da Mojang...`,
+    message: `Downloading vanilla metadata for ${versionId}...`,
   })
 
   const manifest = await fetchJson(MOJANG_VERSION_MANIFEST, signal)
   const version = manifest.versions?.find((candidate) => candidate.id === versionId)
   if (!version?.url) {
-    throw new Error(`Versao Minecraft ${versionId} nao encontrada no manifest da Mojang.`)
+    throw new Error(`Minecraft version ${versionId} was not found in the Mojang manifest.`)
   }
 
   const profile = await fetchJson(version.url, signal)
@@ -1693,7 +1720,7 @@ async function fetchJson(url, signal) {
     redirect: "follow",
   })
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${response.statusText} em ${url}`)
+    throw new Error(`HTTP ${response.status} ${response.statusText} at ${url}`)
   }
   return response.json()
 }
@@ -1948,18 +1975,18 @@ async function installForgeIfNeeded(root, manifest, localState, javaSettings, si
   ) {
     emitLaunchProgress({
       phase: "installing-forge",
-      message: `Forge ${manifest.forge.version} ja instalado.`,
+      message: `Forge ${manifest.forge.version} is already installed.`,
     })
     return targetSha
   }
 
   if (!fsSync.existsSync(installerPath)) {
-    throw new Error(`Forge installer nao encontrado: ${installerPath}`)
+    throw new Error(`Forge installer was not found: ${installerPath}`)
   }
 
   emitLaunchProgress({
     phase: "checking-java",
-    message: "Procurando Java 17 no sistema...",
+    message: "Looking for Java 17 on this PC...",
   })
   const java = await resolveJavaForSettings(
     javaSettings,
@@ -1968,7 +1995,7 @@ async function installForgeIfNeeded(root, manifest, localState, javaSettings, si
   )
   if (!java) {
     throw new Error(
-      "Java 17 nao encontrado. Instale o Eclipse Temurin/OpenJDK 17 ou configure JAVA_HOME.",
+      "Java 17 was not found. Install Eclipse Temurin/OpenJDK 17 or set JAVA_HOME.",
     )
   }
 
@@ -1976,7 +2003,7 @@ async function installForgeIfNeeded(root, manifest, localState, javaSettings, si
 
   emitLaunchProgress({
     phase: "installing-forge",
-    message: `Instalando Forge ${manifest.forge.version} com ${java.version}...`,
+    message: `Installing Forge ${manifest.forge.version} with ${java.version}...`,
   })
 
   await runProcess(
@@ -1995,13 +2022,13 @@ async function installForgeIfNeeded(root, manifest, localState, javaSettings, si
 
   if (!fsSync.existsSync(profileJson)) {
     throw new Error(
-      `Forge terminou, mas o perfil nao foi encontrado em versions/${profileId}.`,
+      `Forge finished, but the profile was not found in versions/${profileId}.`,
     )
   }
 
   emitLaunchProgress({
     phase: "installing-forge",
-    message: `Forge ${manifest.forge.version} instalado com sucesso.`,
+    message: `Forge ${manifest.forge.version} installed.`,
   })
 
   return targetSha
@@ -2052,24 +2079,24 @@ async function loadManifest(settings, signal) {
     redirect: "follow",
   })
   if (!response.ok) {
-    throw new Error(`Falha ao buscar manifest (${response.status} ${response.statusText})`)
+    throw new Error(`Could not fetch the manifest (${response.status} ${response.statusText})`)
   }
   return response.json()
 }
 
 function validateManifest(manifest) {
-  if (!manifest || typeof manifest !== "object") throw new Error("Manifest invalido.")
-  if (!manifest.version) throw new Error("Manifest invalido: campo 'version' ausente.")
-  if (!manifest.minecraft) throw new Error("Manifest invalido: campo 'minecraft' ausente.")
+  if (!manifest || typeof manifest !== "object") throw new Error("Invalid manifest.")
+  if (!manifest.version) throw new Error("Invalid manifest: missing 'version'.")
+  if (!manifest.minecraft) throw new Error("Invalid manifest: missing 'minecraft'.")
   if (!manifest.forge?.url || !manifest.forge?.sha256 || !manifest.forge?.version) {
-    throw new Error("Manifest invalido: bloco 'forge' incompleto.")
+    throw new Error("Invalid manifest: incomplete 'forge' block.")
   }
   if (!Array.isArray(manifest.files)) {
-    throw new Error("Manifest invalido: 'files' deve ser um array.")
+    throw new Error("Invalid manifest: 'files' must be an array.")
   }
   for (const file of manifest.files) {
     if (!file.path || !file.url || !file.sha256 || typeof file.size !== "number") {
-      throw new Error(`Manifest invalido: arquivo '${file.path || "(sem path)"}' incompleto.`)
+      throw new Error(`Invalid manifest: file '${file.path || "(no path)"}' is incomplete.`)
     }
   }
 }
@@ -2116,7 +2143,7 @@ function dropinDir(root) {
 
 function sanitizeDropinFilename(value) {
   const filename = path.basename(String(value || "").trim())
-  if (!/\.jar$/i.test(filename)) throw new Error("Drop-in mod precisa ser um arquivo .jar.")
+  if (!/\.jar$/i.test(filename)) throw new Error("A drop-in mod must be a .jar file.")
   return filename.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
 }
 
@@ -2247,7 +2274,7 @@ async function executeUpdatePlan(root, plan, signal) {
 
   emitLaunchProgress({
     phase: "downloading-files",
-    message: downloads.length ? "Baixando arquivos..." : "Nenhum download necessario.",
+    message: downloads.length ? "Downloading files..." : "No downloads needed.",
     totalBytes: plan.totalBytes,
     loadedBytes,
     filesDone,
@@ -2259,7 +2286,7 @@ async function executeUpdatePlan(root, plan, signal) {
       loadedBytes += delta
       emitLaunchProgress({
         phase: "downloading-files",
-        message: `Baixando ${displayName(action.path)}...`,
+        message: `Downloading ${displayName(action.path)}...`,
         totalBytes: plan.totalBytes,
         loadedBytes,
         filesDone,
@@ -2269,7 +2296,7 @@ async function executeUpdatePlan(root, plan, signal) {
     filesDone++
     emitLaunchProgress({
       phase: "downloading-files",
-      message: `${displayName(action.path)} concluido.`,
+      message: `${displayName(action.path)} complete.`,
       totalBytes: plan.totalBytes,
       loadedBytes,
       filesDone,
@@ -2280,7 +2307,7 @@ async function executeUpdatePlan(root, plan, signal) {
   if (removals.length) {
     emitLaunchProgress({
       phase: "verifying",
-      message: "Removendo arquivos antigos...",
+      message: "Removing old files...",
       totalBytes: plan.totalBytes,
       loadedBytes,
       filesDone,
@@ -2293,7 +2320,7 @@ async function executeUpdatePlan(root, plan, signal) {
 
   emitLaunchProgress({
     phase: "verifying",
-    message: "Verificacao concluida.",
+    message: "Verification complete.",
     totalBytes: plan.totalBytes,
     loadedBytes: plan.totalBytes,
     filesDone: downloads.length,
@@ -2310,11 +2337,11 @@ async function resolveJavaForSettings(javaSettings, minMajor, preferredMajor = m
   if (configuredPath) {
     const configured = await inspectJava(configuredPath)
     if (!configured) {
-      throw new Error(`Java configurado nao foi reconhecido: ${configuredPath}`)
+      throw new Error(`The configured Java executable was not recognized: ${configuredPath}`)
     }
     if (configured.major < minMajor) {
       throw new Error(
-        `Java configurado precisa ser ${minMajor}+; encontrado ${configured.major} em ${configuredPath}`,
+        `Configured Java must be ${minMajor}+; found ${configured.major} at ${configuredPath}`,
       )
     }
     return configured
@@ -2596,7 +2623,7 @@ function runProcess(command, args, options, signal, onLine) {
 
     const abort = () => {
       child.kill()
-      reject(new Error("Operacao cancelada."))
+      reject(new Error("Operation cancelled."))
     }
 
     signal?.addEventListener("abort", abort, { once: true })
@@ -2617,8 +2644,8 @@ function runProcess(command, args, options, signal, onLine) {
         const details = recentLines.map((line) => line.trim()).filter(Boolean).join("\n")
         reject(
           new Error(
-            `Processo terminou com codigo ${code}.` +
-              (details ? `\n\nUltimas linhas do instalador:\n${details}` : ""),
+            `Process exited with code ${code}.` +
+              (details ? `\n\nLast installer lines:\n${details}` : ""),
           ),
         )
       }
@@ -2710,7 +2737,7 @@ async function copyLocalArtifactToTemp(source, temp, expectedSha256, signal, onB
   const actual = hash.digest("hex")
   if (expectedSha256 && actual.toLowerCase() !== expectedSha256.toLowerCase()) {
     throw new Error(
-      `Hash SHA256 nao confere para ${source}\n  esperado: ${expectedSha256}\n  recebido: ${actual}`,
+      `SHA-256 does not match for ${source}\n  expected: ${expectedSha256}\n  received: ${actual}`,
     )
   }
 }
@@ -2719,9 +2746,9 @@ async function downloadUrlToTemp(url, temp, algorithm, expectedHash, signal, onB
   throwIfAborted(signal)
   const response = await fetch(url, { signal, redirect: "follow" })
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${response.statusText} em ${url}`)
+    throw new Error(`HTTP ${response.status} ${response.statusText} at ${url}`)
   }
-  if (!response.body) throw new Error(`Resposta sem stream em ${url}`)
+  if (!response.body) throw new Error(`Response had no stream at ${url}`)
 
   const hash = crypto.createHash(algorithm)
   const writer = fsSync.createWriteStream(temp)
@@ -2745,7 +2772,7 @@ async function downloadUrlToTemp(url, temp, algorithm, expectedHash, signal, onB
   const actual = hash.digest("hex")
   if (expectedHash && actual.toLowerCase() !== expectedHash.toLowerCase()) {
     throw new Error(
-      `Hash ${algorithm.toUpperCase()} nao confere para ${url}\n  esperado: ${expectedHash}\n  recebido: ${actual}`,
+      `Hash ${algorithm.toUpperCase()} does not match for ${url}\n  expected: ${expectedHash}\n  received: ${actual}`,
     )
   }
 }
@@ -2817,7 +2844,7 @@ function safeResolve(root, relativePath) {
   const resolved = path.resolve(root, ...toPosix(relativePath).split("/"))
   const normalizedRoot = path.resolve(root)
   if (resolved !== normalizedRoot && !resolved.startsWith(`${normalizedRoot}${path.sep}`)) {
-    throw new Error(`Caminho invalido no manifest: ${relativePath}`)
+    throw new Error(`Invalid path in the manifest: ${relativePath}`)
   }
   return resolved
 }
@@ -2848,7 +2875,7 @@ function globToRegex(glob) {
 }
 
 function throwIfAborted(signal) {
-  if (signal?.aborted) throw new Error("Operacao cancelada.")
+  if (signal?.aborted) throw new Error("Operation cancelled.")
 }
 
 function emitLaunchProgress(progress) {

@@ -59,7 +59,15 @@ try {
     body = $ReleaseBody
     draft = $false
     prerelease = $false
+    make_latest = "false"
   }
+}
+
+if ($release.id) {
+  Invoke-GitHubJson -Method Patch -Uri "https://api.github.com/repos/$Owner/$Repo/releases/$($release.id)" -Body @{
+    make_latest = "false"
+  } | Out-Null
+  Write-Host "Modpack release stays off GitHub Latest so the launcher updater keeps latest.yml."
 }
 
 $files = Get-ChildItem -Path $AssetsPath -Recurse -File | Sort-Object FullName

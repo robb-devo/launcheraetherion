@@ -71,7 +71,7 @@ export async function executeUpdatePlan(
     })
 
   // --- 1) Downloads com limite de concorrência ---
-  emit("downloading-files", "Baixando arquivos...")
+  emit("downloading-files", "Downloading files...")
 
   await runWithConcurrency(
     downloads,
@@ -89,7 +89,7 @@ export async function executeUpdatePlan(
               loadedBytes += delta
               options.onProgress?.({
                 phase: "downloading-files",
-                message: `Baixando ${displayName(action.path)}...`,
+                message: `Downloading ${displayName(action.path)}...`,
                 totalBytes,
                 loadedBytes,
                 filesDone,
@@ -103,7 +103,7 @@ export async function executeUpdatePlan(
           await options.writeFile(action.path, bytes)
         }
         filesDone++
-        emit("downloading-files", `${displayName(action.path)} concluído`)
+        emit("downloading-files", `${displayName(action.path)} complete`)
       } catch (err) {
         console.error("[v0] download failed", action.path, err)
         failed.push(action.path)
@@ -113,7 +113,7 @@ export async function executeUpdatePlan(
 
   // --- 2) Remoções (rápidas, sequenciais) ---
   if (removals.length && options.removeFile) {
-    emit("verifying", "Removendo arquivos antigos...")
+    emit("verifying", "Removing old files...")
     for (const r of removals) {
       try {
         await options.removeFile(r.path)
@@ -123,7 +123,7 @@ export async function executeUpdatePlan(
     }
   }
 
-  emit("verifying", "Verificação concluída")
+  emit("verifying", "Verification complete")
   return { failed }
 }
 
@@ -163,7 +163,7 @@ export async function downloadWithRetry(
   }
   throw lastError instanceof Error
     ? lastError
-    : new Error(`Falha ao baixar ${url}`)
+    : new Error(`Failed to download ${url}`)
 }
 
 /**
@@ -177,7 +177,7 @@ async function downloadStreaming(
 ): Promise<Uint8Array> {
   const res = await fetch(url, { signal, redirect: "follow" })
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status} ${res.statusText} em ${url}`)
+    throw new Error(`HTTP ${res.status} ${res.statusText} at ${url}`)
   }
   if (!res.body) {
     // Fallback: servidor sem streaming
@@ -238,9 +238,9 @@ async function runWithConcurrency<T>(
 export class HashMismatchError extends Error {
   constructor(url: string, expected: string, actual: string) {
     super(
-      `Hash SHA-256 não confere para ${url}\n` +
-        `  esperado: ${expected}\n` +
-        `  recebido: ${actual}`,
+      `SHA-256 does not match for ${url}\n` +
+        `  expected: ${expected}\n` +
+        `  received: ${actual}`,
     )
     this.name = "HashMismatchError"
   }

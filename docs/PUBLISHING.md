@@ -117,9 +117,9 @@ No build empacotado, o launcher busca por padrao:
 https://raw.githubusercontent.com/washryan/launcheraetherion/main/public/manifest.json
 ```
 
-No launcher, va em Configuracoes > Launcher > Manifest do modpack e cole outra
-URL somente se quiser forcar um manifest remoto diferente. Em desenvolvimento
-tambem funciona por variavel de ambiente:
+In the launcher, open Settings > Launcher and set another manifest URL only if
+you want to force a different remote manifest. In development this also works
+through an environment variable:
 
 ```powershell
 $env:AETHERION_MANIFEST_URL="https://SEU-PROJETO.vercel.app/manifest.json"

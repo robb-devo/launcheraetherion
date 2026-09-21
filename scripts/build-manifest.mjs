@@ -195,7 +195,7 @@ async function main() {
     publishedAt:
       args.publishedAt ?? (templateMode ? "2026-04-21T00:00:00.000Z" : new Date().toISOString()),
     changelog:
-      "- Modpack v0.4 com novos mods de exploracao, magia, tecnologia e mapa\n- Xaero Minimap e Xaero World Map entram como opcionais selecionaveis\n- Forge, libraries, assets e mods sao preparados automaticamente\n- Configuracoes de Java, Minecraft, armazenamento, logs, cache e integridade persistentes",
+      "- Modpack v0.4 adds exploration, magic, technology, and map mods\n- Xaero's Minimap and Xaero's World Map are optional\n- Forge, libraries, assets, and mods are prepared automatically\n- Java, Minecraft, storage, logs, cache, and integrity settings stay on this PC",
     requiredLauncherVersion: "0.2.0",
     forge: await buildForgeEntry(),
     files,

@@ -1,5 +1,5 @@
 param(
-  [string]$Version = "0.3.0",
+  [string]$Version = "",
   [string]$Owner = "washryan",
   [string]$Repo = "launcheraetherion",
   [string]$InstallerPath = "",
@@ -7,6 +7,14 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $Version) {
+  $packageJson = Get-Content (Join-Path (Get-Location) "package.json") -Raw | ConvertFrom-Json
+  $Version = $packageJson.version
+  if (-not $Version) {
+    throw "package.json nao tem version. Passe -Version explicitamente."
+  }
+}
 
 if (-not $env:GITHUB_TOKEN) {
   throw "Defina GITHUB_TOKEN com permissao de Contents: Read and write antes de publicar."
@@ -64,25 +72,43 @@ try {
     body = $ReleaseBody
     draft = $false
     prerelease = $false
+    make_latest = "true"
   }
 }
 
-$existingAsset = $release.assets | Where-Object { $_.name -eq $installer.Name } | Select-Object -First 1
-if ($existingAsset) {
-  Write-Host "Removendo asset antigo: $($installer.Name)"
-  Invoke-GitHubJson -Method Delete -Uri "https://api.github.com/repos/$Owner/$Repo/releases/assets/$($existingAsset.id)" | Out-Null
+Write-Host "Marking $tag as the latest GitHub release"
+$release = Invoke-GitHubJson -Method Patch -Uri "https://api.github.com/repos/$Owner/$Repo/releases/$($release.id)" -Body @{
+  make_latest = "true"
 }
 
+$distDir = Join-Path (Get-Location) "dist"
+$blockmap = Get-Item "$($installer.FullName).blockmap" -ErrorAction SilentlyContinue
+$latestYml = Join-Path $distDir "latest.yml"
+if (-not (Test-Path $latestYml)) {
+  throw "latest.yml was not found in dist. electron-builder must generate it so installed launchers can update."
+}
+$assetsToUpload = @($installer.FullName)
+if ($blockmap) { $assetsToUpload += $blockmap.FullName }
+if (Test-Path $latestYml) { $assetsToUpload += $latestYml }
+
 $uploadUrl = $release.upload_url -replace "\{\?name,label\}", ""
-$encodedName = [uri]::EscapeDataString($installer.Name)
-$target = "$uploadUrl`?name=$encodedName"
 
-Write-Host "Enviando asset: $($installer.Name) ($($installer.Length) bytes)"
-Invoke-WebRequest `
-  -Method Post `
-  -Uri $target `
-  -Headers $headers `
-  -ContentType "application/octet-stream" `
-  -InFile $installer.FullName | Out-Null
+foreach ($assetPath in $assetsToUpload) {
+  $asset = Get-Item $assetPath
+  $existingAsset = $release.assets | Where-Object { $_.name -eq $asset.Name } | Select-Object -First 1
+  if ($existingAsset) {
+    Write-Host "Removing previous asset: $($asset.Name)"
+    Invoke-GitHubJson -Method Delete -Uri "https://api.github.com/repos/$Owner/$Repo/releases/assets/$($existingAsset.id)" | Out-Null
+  }
 
-Write-Host "Publicado: https://github.com/$Owner/$Repo/releases/download/$tag/$encodedName"
+  $encodedName = [uri]::EscapeDataString($asset.Name)
+  $target = "$uploadUrl`?name=$encodedName"
+  Write-Host "Uploading asset: $($asset.Name) ($($asset.Length) bytes)"
+  Invoke-WebRequest `
+    -Method Post `
+    -Uri $target `
+    -Headers $headers `
+    -ContentType "application/octet-stream" `
+    -InFile $asset.FullName | Out-Null
+  Write-Host "Published: https://github.com/$Owner/$Repo/releases/download/$tag/$encodedName"
+}

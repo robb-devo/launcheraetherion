@@ -10,10 +10,11 @@ import {
   SettingsSection,
 } from "@/components/launcher/settings-shell"
 import { DEFAULT_SETTINGS } from "@/lib/launcher/mock-data"
+import { LAUNCHER_BUILD_LABEL, LAUNCHER_VERSION } from "@/lib/launcher/version"
 
 export function LauncherTab() {
   const [prefs, setPrefs] = useState(DEFAULT_SETTINGS.launcher)
-  const [status, setStatus] = useState("Configuracoes locais prontas.")
+  const [status, setStatus] = useState("Local settings are ready.")
 
   useEffect(() => {
     window.aetherion?.settings
@@ -32,7 +33,7 @@ export function LauncherTab() {
         ?.update({ launcher: resolved })
         .then((settings) => {
           setPrefs(settings.launcher)
-          setStatus("Configuracoes salvas.")
+          setStatus("Settings saved.")
         })
         .catch((err) => {
           console.warn("[aetherion] failed to save launcher settings", err)
@@ -57,7 +58,7 @@ export function LauncherTab() {
       const result = await window.aetherion?.launcher?.verifyIntegrity()
       if (!result) return
       setStatus(
-        `Integridade verificada: ${result.downloadCount} download(s), ${result.removeCount} remocao(oes).`,
+        `Integrity checked: ${result.downloadCount} download(s), ${result.removeCount} removal(s).`,
       )
     } catch (err) {
       console.warn("[aetherion] verify integrity failed", err)
@@ -69,11 +70,11 @@ export function LauncherTab() {
     <>
       <SettingsSection
         title="Launcher"
-        description="Comportamento da janela e informacoes locais."
+        description="Window behavior and local details."
       >
         <SettingsRow
-          label="Minimizar para a bandeja"
-          description="Ao fechar, o launcher continua rodando em segundo plano."
+          label="Minimize to tray"
+          description="Closing the window keeps the launcher running in the background."
         >
           <Switch
             checked={prefs.minimizeToTray}
@@ -82,8 +83,8 @@ export function LauncherTab() {
         </SettingsRow>
 
         <SettingsRow
-          label="Telemetria anonima"
-          description="Ajuda a detectar crashes e bugs. Nenhum dado pessoal e enviado."
+          label="Anonymous telemetry"
+          description="Helps catch crashes and bugs. No personal data is sent."
         >
           <Switch
             checked={prefs.telemetry}
@@ -94,8 +95,8 @@ export function LauncherTab() {
       </SettingsSection>
 
       <SettingsSection
-        title="Armazenamento"
-        description="Instancias, mods baixados, caches e logs ficam aqui."
+        title="Storage"
+        description="Instances, downloaded mods, caches, and logs live here."
       >
         <div className="flex items-center gap-2">
           <HardDrive className="size-4 text-muted-foreground shrink-0" />
@@ -111,51 +112,51 @@ export function LauncherTab() {
             onClick={() =>
               runLauncherAction(
                 () => window.aetherion?.launcher?.openDataDirectory() ?? Promise.resolve(),
-                "Pasta de armazenamento aberta.",
+                "Storage folder opened.",
               )
             }
           >
             <FolderOpen className="size-4" />
-            Abrir
+            Open
           </Button>
         </div>
 
         <div className="grid grid-cols-3 gap-3 pt-2">
           <ActionCard
             icon={<RotateCcw className="size-4" />}
-            title="Verificar integridade"
-            description="Recalcula hashes e baixa arquivos corrompidos."
+            title="Verify integrity"
+            description="Rechecks hashes and downloads damaged files."
             onClick={verifyIntegrity}
           />
           <ActionCard
             icon={<Trash2 className="size-4" />}
-            title="Limpar cache"
-            description="Remove downloads temporarios e thumbnails."
+            title="Clear cache"
+            description="Removes temporary downloads."
             onClick={() =>
               runLauncherAction(
                 () => window.aetherion?.launcher?.clearCache() ?? Promise.resolve(),
-                "Cache local limpo.",
+                "Local cache cleared.",
               )
             }
           />
           <ActionCard
             icon={<FileText className="size-4" />}
-            title="Ver logs"
-            description="Abre a pasta de logs do launcher e do jogo."
+            title="View logs"
+            description="Opens the launcher and game log folder."
             onClick={() =>
               runLauncherAction(
                 () => window.aetherion?.launcher?.openLogsDirectory() ?? Promise.resolve(),
-                "Pasta de logs aberta.",
+                "Log folder opened.",
               )
             }
           />
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Sobre">
-        <div className="rounded-lg border border-border/50 bg-card/40 p-5 space-y-3">
-          <InfoLine label="Launcher" value="Aetherion v0.3.0" />
-          <InfoLine label="Build" value="2026.04.21" />
+      <SettingsSection title="About">
+        <div className="aetherion-glass space-y-3 rounded-2xl p-5">
+          <InfoLine label="Launcher" value={`Aetherion v${LAUNCHER_VERSION}`} />
+          <InfoLine label="Build" value={LAUNCHER_BUILD_LABEL} />
           <InfoLine label="Electron" value="Real" />
           <InfoLine label="Node" value="Runtime local" />
         </div>
@@ -179,7 +180,7 @@ function ActionCard({
     <button
       type="button"
       onClick={onClick}
-      className="text-left p-4 rounded-lg border border-border/50 bg-card/40 hover:border-primary/40 hover:bg-primary/5 transition"
+      className="rounded-xl border border-white/8 bg-card/40 p-4 text-left transition duration-200 hover:border-primary/40 hover:bg-primary/5"
     >
       <span className="inline-flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
         {icon}

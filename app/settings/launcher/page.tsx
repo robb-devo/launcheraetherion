@@ -4,8 +4,8 @@ import { LauncherTab } from "@/components/settings/launcher-tab"
 export default function LauncherPage() {
   return (
     <SettingsPage
-      title="Configurações do Launcher"
-      description="Comportamento do próprio Aetherion: atualizações, armazenamento e ferramentas."
+      title="Launcher settings"
+      description="How Aetherion behaves: updates, storage, and tools."
     >
       <LauncherTab />
     </SettingsPage>

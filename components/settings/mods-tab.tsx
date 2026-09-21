@@ -19,6 +19,7 @@ import {
   REQUIRED_MODS,
 } from "@/lib/launcher/mock-data"
 import type { DropinMod, ManifestFile } from "@/lib/launcher/types"
+import { displayModTag } from "@/lib/launcher/labels"
 import { cn } from "@/lib/utils"
 
 function formatSize(bytes: number) {
@@ -32,7 +33,7 @@ export function ModsTab() {
     Object.fromEntries(OPTIONAL_MODS.map((m) => [m.path, m.defaultEnabled ?? false])),
   )
   const [dropins, setDropins] = useState<DropinMod[]>(MOCK_DROPIN_MODS)
-  const [status, setStatus] = useState("Drop-ins locais prontos.")
+  const [status, setStatus] = useState("Local drop-ins are ready.")
 
   useEffect(() => {
     reloadDropins()
@@ -42,7 +43,7 @@ export function ModsTab() {
     try {
       const mods = await window.aetherion?.mods?.listDropins()
       if (mods) setDropins(mods)
-      setStatus("Drop-ins atualizados.")
+      setStatus("Drop-ins refreshed.")
     } catch (err) {
       console.warn("[aetherion] failed to load drop-in mods", err)
       setStatus(err instanceof Error ? err.message : String(err))
@@ -53,7 +54,7 @@ export function ModsTab() {
     try {
       const mods = await window.aetherion?.mods?.addDropins()
       if (mods) setDropins(mods)
-      setStatus("Mod adicionado em mods/dropin.")
+      setStatus("Mod added to mods/dropin.")
     } catch (err) {
       console.warn("[aetherion] failed to add drop-in mod", err)
       setStatus(err instanceof Error ? err.message : String(err))
@@ -66,11 +67,11 @@ export function ModsTab() {
       await window.aetherion?.mods?.setOptional(path, enabled)
       if (enabled && isOptiFinePath(path)) {
         setStatus(
-          "OptiFine ativado em modo experimental. Se o jogo fechar com erro de mixin/Aether, desligue apenas o OptiFine e deixe os outros opcionais ligados.",
+          "OptiFine is on in experimental mode. If the game closes with a mixin/Aether error, turn off only OptiFine and leave the other optional mods on.",
         )
         return
       }
-      setStatus("Mods opcionais atualizados.")
+      setStatus("Optional mods updated.")
     } catch (err) {
       console.warn("[aetherion] failed to update optional mod", err)
       setOptional((prev) => ({ ...prev, [path]: !enabled }))
@@ -97,7 +98,7 @@ export function ModsTab() {
     try {
       const mods = await window.aetherion?.mods?.removeDropin(filename)
       if (mods) setDropins(mods)
-      setStatus("Drop-in removido.")
+      setStatus("Drop-in removed.")
     } catch (err) {
       console.warn("[aetherion] failed to remove drop-in mod", err)
       await reloadDropins()
@@ -117,8 +118,8 @@ export function ModsTab() {
   return (
     <>
       <SettingsSection
-        title={`Obrigatórios (${REQUIRED_MODS.length})`}
-        description="Mods definidos pelo manifest do servidor. Não podem ser desativados."
+        title={`Required (${REQUIRED_MODS.length})`}
+        description="Mods defined by the server manifest. They cannot be turned off."
       >
         <div className="rounded-lg border border-border/50 divide-y divide-border/40">
           {REQUIRED_MODS.map((mod) => (
@@ -128,8 +129,8 @@ export function ModsTab() {
       </SettingsSection>
 
       <SettingsSection
-        title={`Opcionais (${OPTIONAL_MODS.length})`}
-        description="Você pode ativar ou desativar livremente."
+        title={`Optional (${OPTIONAL_MODS.length})`}
+        description="You can turn these on or off."
       >
         <div className="rounded-lg border border-border/50 divide-y divide-border/40">
           {OPTIONAL_MODS.map((mod) => (
@@ -145,7 +146,7 @@ export function ModsTab() {
 
       <SettingsSection
         title="Drop-in Mods"
-        description="Mods que você adicionou manualmente. O launcher preserva esses arquivos durante atualizações."
+        description="Mods you added yourself. The launcher keeps these files across modpack updates."
       >
         <div className="flex items-center gap-2">
           <Button
@@ -155,7 +156,7 @@ export function ModsTab() {
             onClick={addDropins}
           >
             <Upload className="size-4" />
-            Adicionar .jar
+            Add .jar
           </Button>
           <Button
             variant="ghost"
@@ -164,7 +165,7 @@ export function ModsTab() {
             onClick={reloadDropins}
           >
             <RefreshCw className="size-4" />
-            Recarregar
+            Reload
           </Button>
           <Button
             variant="ghost"
@@ -173,10 +174,10 @@ export function ModsTab() {
             onClick={openDropinFolder}
           >
             <FolderOpen className="size-4" />
-            Abrir pasta
+            Open folder
           </Button>
           <p className="ml-auto text-xs text-muted-foreground">
-            Pasta: <code className="font-mono">mods/dropin/</code>
+            Folder: <code className="font-mono">mods/dropin/</code>
           </p>
         </div>
         <p className="text-[11px] text-muted-foreground">{status}</p>
@@ -184,7 +185,7 @@ export function ModsTab() {
         <div className="rounded-lg border border-border/50 divide-y divide-border/40">
           {dropins.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
-              Nenhum mod adicionado ainda.
+              No mods added yet.
             </div>
           ) : (
             dropins.map((mod) => (
@@ -204,7 +205,7 @@ export function ModsTab() {
                   variant="ghost"
                   className="size-8 text-muted-foreground hover:text-destructive"
                   onClick={() => removeDropin(mod.filename)}
-                  aria-label={`Remover ${mod.filename}`}
+                  aria-label={`Remove ${mod.filename}`}
                 >
                   <Trash2 className="size-4" />
                 </Button>
@@ -216,7 +217,7 @@ export function ModsTab() {
 
       <SettingsSection
         title="Shaderpacks"
-        description="Shaders funcionam apenas em máquinas potentes. Instale Iris/Oculus para suporte."
+        description="Shaders need a capable PC. Install Iris or Oculus for support."
       >
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" className="h-9 w-9 bg-transparent">
@@ -246,7 +247,7 @@ function isOptiFinePath(filePath: string) {
 function getModHint(mod: ManifestFile) {
   if (mod.description) return mod.description
   if (isOptiFinePath(mod.path)) {
-    return "Experimental: neste pack pode conflitar com Aether. Se travar ao abrir, desligue so o OptiFine."
+    return "Experimental: this pack can conflict with Aether. If the game fails to open, turn off only OptiFine."
   }
   return null
 }
@@ -270,7 +271,7 @@ function ModRow({
       <div
         className={cn(
           "size-2 rounded-full shrink-0",
-          locked ? "bg-primary" : enabled ? "bg-accent" : "bg-muted",
+          locked ? "bg-primary" : enabled ? "bg-magic" : "bg-muted",
         )}
       />
       <div className="flex-1 min-w-0">
@@ -282,7 +283,7 @@ function ModRow({
               variant="outline"
               className="text-[10px] uppercase tracking-wider border-border/60 text-muted-foreground"
             >
-              {mod.tag}
+              {displayModTag(mod.tag)}
             </Badge>
           )}
         </div>
@@ -295,7 +296,7 @@ function ModRow({
       {locked ? (
         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted text-muted-foreground text-xs">
           <Lock className="size-3" />
-          Travado
+          Locked
         </div>
       ) : (
         <Switch checked={enabled ?? false} onCheckedChange={onToggle} />

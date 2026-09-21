@@ -21,7 +21,7 @@ export function JavaTab() {
   const [java, setJava] = useState(DEFAULT_SETTINGS.java)
   const [totalRamMb, setTotalRamMb] = useState(FALLBACK_SYSTEM_RAM_MB)
   const [detectedJava, setDetectedJava] = useState<DetectedJava>(null)
-  const [status, setStatus] = useState("Carregando configuracao Java...")
+  const [status, setStatus] = useState("Loading Java settings...")
 
   useEffect(() => {
     if (!window.aetherion?.settings) return
@@ -31,7 +31,7 @@ export function JavaTab() {
       .then((state) => setJava(state.java))
       .catch((err) => {
         console.warn("[aetherion] failed to load java settings", err)
-        setStatus("Nao foi possivel carregar as configuracoes locais.")
+        setStatus("Could not load local settings.")
       })
 
     refreshJavaDetection()
@@ -45,8 +45,8 @@ export function JavaTab() {
         setDetectedJava(info.java)
         setStatus(
           info.java
-            ? `Java ${info.java.major} pronto em ${info.java.path}`
-            : "Nenhum Java 17+ encontrado.",
+            ? `Java ${info.java.major} ready at ${info.java.path}`
+            : "No Java 17+ found.",
         )
       })
       .catch((err) => {
@@ -83,7 +83,7 @@ export function JavaTab() {
       if (!result) return
       setJava(result.settings.java)
       setDetectedJava(result.java)
-      setStatus(`Java ${result.java.major} selecionado.`)
+      setStatus(`Java ${result.java.major} selected.`)
     } catch (err) {
       console.warn("[aetherion] failed to choose java", err)
       setStatus(err instanceof Error ? err.message : String(err))
@@ -97,12 +97,12 @@ export function JavaTab() {
   return (
     <>
       <SettingsSection
-        title="Memoria"
-        description={`Total do sistema: ${totalGb.toFixed(1)} GB. Recomendado: 6-10 GB para modpacks.`}
+        title="Memory"
+        description={`System total: ${totalGb.toFixed(1)} GB. Recommended: 6-10 GB for modpacks.`}
       >
-        <div className="rounded-lg border border-border/50 bg-card/40 p-5 space-y-6">
+        <div className="space-y-6 rounded-2xl border border-white/8 bg-card/40 p-5">
           <MemorySlider
-            label="RAM maxima"
+            label="Maximum RAM"
             value={java.maxRamMb}
             min={2048}
             max={totalRamMb}
@@ -115,7 +115,7 @@ export function JavaTab() {
             display={`${maxGb.toFixed(1)} GB`}
           />
           <MemorySlider
-            label="RAM minima"
+            label="Minimum RAM"
             value={java.minRamMb}
             min={1024}
             max={java.maxRamMb}
@@ -124,32 +124,32 @@ export function JavaTab() {
             display={`${minGb.toFixed(1)} GB`}
           />
           <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border/40">
-            <MemoryStat label="Alocada" value={`${maxGb.toFixed(1)} GB`} accent />
-            <MemoryStat label="Minima" value={`${minGb.toFixed(1)} GB`} />
-            <MemoryStat label="Sistema" value={`${totalGb.toFixed(1)} GB`} />
+            <MemoryStat label="Allocated" value={`${maxGb.toFixed(1)} GB`} accent />
+            <MemoryStat label="Minimum" value={`${minGb.toFixed(1)} GB`} />
+            <MemoryStat label="System" value={`${totalGb.toFixed(1)} GB`} />
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          O launcher aplica estes valores como -Xms e -Xmx no processo do Minecraft.
-          Se o Java gerar erro de memoria, reduza a RAM ou aumente o arquivo de paginacao do Windows.
+          The launcher applies these values as -Xms and -Xmx for Minecraft.
+          If Java runs out of memory, lower the RAM or increase the Windows page file.
         </p>
       </SettingsSection>
 
       <SettingsSection
-        title="Executavel Java"
-        description="O launcher valida o binario antes de iniciar o jogo. Use Java 17 ou superior."
+        title="Java executable"
+        description="The launcher checks the binary before the game starts. Use Java 17 or newer."
       >
-        <div className="rounded-lg border border-border/50 bg-card/40 p-5 space-y-4">
+        <div className="space-y-4 rounded-2xl border border-white/8 bg-card/40 p-5">
           <div className="flex items-start gap-3">
             <div className="size-9 inline-flex items-center justify-center rounded-md bg-primary/10 text-primary shrink-0">
               <CheckCircle2 className="size-5" />
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-foreground">
-                {detectedJava ? `Java ${detectedJava.major} detectado` : "Java nao detectado"}
+                {detectedJava ? `Java ${detectedJava.major} detected` : "Java not detected"}
               </p>
               <p className="text-xs text-muted-foreground">
-                Recomendado para Minecraft {MOCK_MANIFEST_PREVIEW.minecraft} (Forge{" "}
+                Recommended for Minecraft {MOCK_MANIFEST_PREVIEW.minecraft} (Forge{" "}
                 {MOCK_MANIFEST_PREVIEW.forgeVersion}) - major &gt;= 17
               </p>
               <p className="mt-1 text-[11px] text-muted-foreground font-mono">{status}</p>
@@ -160,7 +160,7 @@ export function JavaTab() {
             <Coffee className="size-4 text-muted-foreground shrink-0" />
             <Input
               readOnly
-              value={java.executablePath || detectedJava?.path || "Auto detectar Java 17+"}
+              value={java.executablePath || detectedJava?.path || "Auto-detect Java 17+"}
               className="flex-1 h-9 bg-input/40 font-mono text-xs"
             />
             <Button
@@ -170,13 +170,13 @@ export function JavaTab() {
               onClick={chooseJava}
             >
               <FolderOpen className="size-4" />
-              Escolher
+              Choose
             </Button>
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-border/40">
             <p className="text-xs text-muted-foreground">
-              Se nao houver Java compativel instalado, instale um runtime Java 17.
+              If no compatible Java is installed, install a Java 17 runtime.
             </p>
             <Button
               variant="ghost"
@@ -187,15 +187,15 @@ export function JavaTab() {
               }
             >
               <Download className="size-4" />
-              Baixar runtime
+              Download runtime
             </Button>
           </div>
         </div>
       </SettingsSection>
 
       <SettingsSection
-        title="Opcoes JVM adicionais"
-        description="Argumentos passados ao processo Java. Use com cuidado."
+        title="Extra JVM options"
+        description="Arguments passed to the Java process. Use with care."
       >
         <Textarea
           value={java.jvmArgs}
@@ -204,8 +204,8 @@ export function JavaTab() {
           spellCheck={false}
         />
         <p className="text-[11px] text-muted-foreground">
-          O launcher controla -Xms e -Xmx pelos sliders. Se voce digitar esses argumentos
-          aqui, eles serao ignorados para evitar conflito.
+          The launcher sets -Xms and -Xmx from the sliders. If you type those arguments
+          here, they are ignored so they do not conflict.
         </p>
       </SettingsSection>
     </>

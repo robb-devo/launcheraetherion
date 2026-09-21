@@ -68,7 +68,7 @@ export const DEFAULT_SETTINGS: LauncherSettings = {
 export const MOCK_SERVER_STATUS: ServerStatus = {
   online: true,
   players: { current: 147, max: 1000 },
-  motd: "Aetherion - Reino Etereo",
+  motd: "Aetherion - Ethereal Realm",
   ping: 32,
 }
 

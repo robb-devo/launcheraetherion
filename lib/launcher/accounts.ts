@@ -54,9 +54,9 @@ export const USERNAME_REGEX = /^[A-Za-z0-9_]{3,16}$/
 
 export function validateOfflineUsername(username: string): string | null {
   const trimmed = username.trim()
-  if (!trimmed) return "Informe um nome de usuário."
+  if (!trimmed) return "Enter a username."
   if (!USERNAME_REGEX.test(trimmed))
-    return "Use 3 a 16 caracteres: letras, números ou underline."
+    return "Use 3 to 16 characters: letters, numbers, or underscore."
   return null
 }
 
@@ -71,7 +71,7 @@ export async function addOfflineAccount(
   const existing = state.accounts.find(
     (a) => a.type === "offline" && a.username.toLowerCase() === clean.toLowerCase(),
   )
-  if (existing) throw new Error("Essa conta offline já foi adicionada.")
+  if (existing) throw new Error("That offline account is already added.")
 
   const uuid = await offlineUuidFor(clean)
   const account: Account = {
@@ -136,7 +136,7 @@ export function removeAccount(state: AccountsState, id: string): AccountsState {
 
 export function setActiveAccount(state: AccountsState, id: string): AccountsState {
   if (!state.accounts.some((a) => a.id === id))
-    throw new Error("Conta não encontrada.")
+    throw new Error("Account not found.")
   return { ...state, activeId: id }
 }
 

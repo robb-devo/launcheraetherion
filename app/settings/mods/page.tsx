@@ -7,7 +7,7 @@ export default function ModsPage() {
   return (
     <SettingsPage
       title="Mods & Shaders"
-      description="Mods obrigatórios seguem o manifest remoto. Opcionais e drop-in ficam sob seu controle."
+      description="Required mods follow the remote manifest. Optional and drop-in mods stay under your control."
       actions={
         <Badge
           variant="outline"

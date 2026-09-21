@@ -1,13 +1,13 @@
 import type { Metadata } from "next"
-import { Inter, Cinzel } from "next/font/google"
+import { Cinzel, Outfit } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || ""
 
-const inter = Inter({
+const outfit = Outfit({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-outfit",
   display: "swap",
 })
 
@@ -20,7 +20,7 @@ const cinzel = Cinzel({
 
 export const metadata: Metadata = {
   title: "Aetherion Launcher",
-  description: "Launcher premium para Minecraft — gerenciador de contas, modpacks e runtime Java.",
+  description: "Premium Minecraft launcher for accounts, modpacks, and the Java runtime.",
   generator: "v0.app",
   icons: {
     icon: `${basePath}/icon.svg`,
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: "#121018",
   width: "device-width",
   initialScale: 1,
 }
@@ -39,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="pt-BR" className={`${inter.variable} ${cinzel.variable} bg-background dark`}>
+    <html lang="en" className={`${outfit.variable} ${cinzel.variable} bg-background dark`}>
       <body className="font-sans antialiased bg-background text-foreground">
         {children}
         {process.env.NODE_ENV === "production" && <Analytics />}
