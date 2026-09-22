@@ -10,6 +10,7 @@ const {
   assertClientPack,
 } = require("./lib/pack-manifest.cjs")
 const { clientJarArtifact } = require("./lib/client-jar.cjs")
+const { assertSandboxJoin } = require("./lib/production-guard.cjs")
 const { spawn } = require("node:child_process")
 const crypto = require("node:crypto")
 const fsSync = require("node:fs")
@@ -790,8 +791,19 @@ function clampNumber(value, min, max, fallback) {
 }
 
 async function runUpdater(args, signal) {
+  let request = args || {}
+  if (request.isolated || request.serverHost) {
+    const sandboxJoin = assertSandboxJoin(request.serverHost, request.serverPort)
+    request = {
+      ...request,
+      isolated: true,
+      serverHost: sandboxJoin.host,
+      serverPort: sandboxJoin.port,
+      autoConnectServer: false,
+    }
+  }
   const settings = await readLauncherSettings()
-  const launchArgs = normalizeLaunchArgs(args, settings)
+  const launchArgs = normalizeLaunchArgs(request, settings)
 
   emitLaunchProgress({
     phase: "fetching-manifest",
@@ -884,12 +896,13 @@ async function runUpdater(args, signal) {
 
 function normalizeLaunchArgs(args, settings) {
   const minecraft = settings.minecraft
+  const directServer = Boolean(String(args?.serverHost || "").trim()) || Boolean(args?.isolated)
   return {
     ...args,
     fullscreen: Boolean(minecraft.fullscreen),
     width: minecraft.resolution.width,
     height: minecraft.resolution.height,
-    autoConnectServer: Boolean(minecraft.autoConnectServer),
+    autoConnectServer: directServer ? false : Boolean(minecraft.autoConnectServer),
     detachProcess: Boolean(minecraft.detachProcess),
     closeOnLaunch: Boolean(minecraft.closeOnLaunch),
     java: settings.java,
@@ -990,20 +1003,22 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
   const directHost = String(args?.serverHost || "").trim()
   const directPort = Number(args?.serverPort)
   if (args?.fullscreen) gameArgs.push("--fullscreen")
-  if (directHost) {
-    gameArgs.push("--server", directHost)
-    if (Number.isInteger(directPort) && directPort > 0) gameArgs.push("--port", String(directPort))
+  let sandboxTarget = null
+  if (args?.isolated || directHost) {
+    sandboxTarget = assertSandboxJoin(directHost, directPort)
+    gameArgs.push("--server", sandboxTarget.host)
+    gameArgs.push("--port", String(sandboxTarget.port))
   } else if (args?.autoConnectServer) {
     gameArgs.push("--server", realm.host)
     gameArgs.push("--port", String(realm.port || AETHERION_SERVER_PORT))
   }
   await ensureMinecraftServerList(
     root,
-    directHost
+    sandboxTarget
       ? {
-          name: String(args?.serverName || "Aetherion Sandbox"),
-          host: directHost,
-          port: Number.isInteger(directPort) ? directPort : 25565,
+          host: sandboxTarget.host,
+          port: sandboxTarget.port,
+          name: String(args?.serverName || "Sandbox"),
         }
       : null,
   )
@@ -1291,8 +1306,17 @@ async function ensureMinecraftServerList(root, extra) {
   const wanted = [{ name: AETHERION_SERVER_NAME, ip: AETHERION_SERVER_HOST }]
   if (extra?.host) {
     const port = Number(extra.port)
-    const ip = Number.isInteger(port) && port > 0 && port !== 25565 ? `${extra.host}:${port}` : extra.host
-    wanted.push({ name: extra.name || "Aetherion Sandbox", ip })
+    if (!Number.isInteger(port) || port === AETHERION_SERVER_PORT) {
+      throw new Error("Sandboxes stay off the live Aetherion realm.")
+    }
+    const host = String(extra.host || "").trim().toLowerCase().replace(/\.$/, "")
+    if (host === AETHERION_SERVER_HOST || host.endsWith(`.${AETHERION_SERVER_HOST}`)) {
+      throw new Error("Sandboxes stay off the live Aetherion realm.")
+    }
+    wanted.push({
+      name: extra.name || "Sandbox",
+      ip: `${String(extra.host).trim()}:${port}`,
+    })
   }
 
   let changed = false

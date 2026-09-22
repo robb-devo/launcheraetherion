@@ -24,6 +24,7 @@ declare global {
           width: number
           height: number
           autoConnectServer?: boolean
+          isolated?: boolean
           detachProcess?: boolean
           closeOnLaunch?: boolean
           serverHost?: string

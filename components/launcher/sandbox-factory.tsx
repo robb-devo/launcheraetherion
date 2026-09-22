@@ -168,6 +168,7 @@ export function SandboxFactory() {
         width: settings?.minecraft.resolution.width ?? 1280,
         height: settings?.minecraft.resolution.height ?? 720,
         autoConnectServer: false,
+        isolated: true,
         detachProcess: settings?.minecraft.detachProcess ?? true,
         closeOnLaunch: settings?.minecraft.closeOnLaunch ?? false,
         serverHost: host,
@@ -196,7 +197,7 @@ export function SandboxFactory() {
             <p className="aetherion-kicker text-primary/85!">Sandbox factory</p>
             <h1 className="mt-2 font-serif text-3xl tracking-[0.12em] text-foreground">Your server</h1>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-              Name it, pick an engine and a size, then share the address. Microsoft sign-in owns the server.
+              A private server on spare capacity. It does not join or change the live realm.
             </p>
           </div>
           <Link

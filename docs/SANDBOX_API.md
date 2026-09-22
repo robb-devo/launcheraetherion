@@ -1,6 +1,6 @@
 # Sandbox API
 
-Your server calls the control API at `http://135.181.18.162:5055`. The window has no access-code field and no API-URL form. The credential stays in `electron/lib/control.cjs`.
+Your server calls the control API at `http://135.181.18.162:5055` and only creates spare-capacity sandboxes. Those servers are not the live realm at `play.donnernet.de:25565`. The launcher will not join that realm from Your server. The window has no access-code field and no API-URL form. The credential stays in `electron/lib/control.cjs`.
 
 The contract is [aetherion-control #5](https://github.com/robb-devo/aetherion-control/pull/5). It is not live on `135.181.18.162` until that host restarts onto the merged API. Until then a sandbox call returns 401 and the page says “Sandbox API is temporarily unavailable.”
 

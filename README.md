@@ -27,6 +27,6 @@ This Linux checkout cannot produce the NSIS installer. Use Windows or the releas
 
 ## Sign in and servers
 
-Microsoft sign-in uses the Xbox Live / Minecraft Services flow inside the app. Your servers are created through the control API at `http://135.181.18.162:5055` and are scoped to the signed-in Microsoft UUID. There is no access-code field. Until that host restarts onto the friend-key API, Your server says the sandbox API is temporarily unavailable.
+Microsoft sign-in uses the Xbox Live / Minecraft Services flow inside the app. Play on the dashboard joins the live realm at play.donnernet.de. Your server creates a separate sandbox on spare capacity through the control API at `http://135.181.18.162:5055` and never sends that join to the live realm. There is no access-code field. Until that host restarts onto the friend-key API, Your server says the sandbox API is temporarily unavailable.
 
 See `docs/SANDBOX_API.md` if sandbox calls are refused.
