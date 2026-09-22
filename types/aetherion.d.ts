@@ -20,6 +20,9 @@ declare global {
           autoConnectServer?: boolean
           detachProcess?: boolean
           closeOnLaunch?: boolean
+          serverHost?: string
+          serverPort?: number
+          serverName?: string
         }) => Promise<{
           ok: boolean
           target?: {
@@ -64,6 +67,28 @@ declare global {
             version: string
           }
         } | null>
+      }
+      status: {
+        realm: () => Promise<{
+          host: string
+          port: number
+          state: "online" | "offline" | "unknown"
+          online: boolean | null
+          players: { current: number; max: number } | null
+          ping: number | null
+          motd: string | null
+          mojang: "online" | "unknown"
+        }>
+      }
+      sandbox: {
+        options: () => Promise<import("@/lib/launcher/sandbox").SandboxOptions>
+        list: () => Promise<{ servers: import("@/lib/launcher/sandbox").SandboxServer[] }>
+        create: (
+          input: import("@/lib/launcher/sandbox").SandboxCreateInput,
+        ) => Promise<import("@/lib/launcher/sandbox").SandboxServer>
+        start: (id: string) => Promise<{ ok?: boolean; address?: string; running?: boolean | null }>
+        stop: (id: string) => Promise<{ ok?: boolean; address?: string; running?: boolean | null }>
+        remove: (id: string) => Promise<{ ok?: boolean; id?: string }>
       }
       launcher: {
         openDataDirectory: () => Promise<{ ok: boolean }>

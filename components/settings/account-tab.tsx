@@ -7,7 +7,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { AccountsState } from "@/lib/launcher/types"
-import { MOCK_ACCOUNTS } from "@/lib/launcher/mock-data"
 import {
   addOfflineAccount,
   removeAccount as removeAccountLib,
@@ -24,10 +23,7 @@ import { cn } from "@/lib/utils"
  */
 export function AccountTab() {
   const router = useRouter()
-  const [state, setState] = useState<AccountsState>(() => ({
-    activeId: MOCK_ACCOUNTS[0]?.id ?? null,
-    accounts: MOCK_ACCOUNTS,
-  }))
+  const [state, setState] = useState<AccountsState>({ activeId: null, accounts: [] })
   const [username, setUsername] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -94,9 +90,41 @@ export function AccountTab() {
     }
   }
 
+  async function handleMicrosoft() {
+    if (busy) return
+    if (!window.aetherion?.accounts) {
+      setError("Microsoft sign-in runs in the desktop launcher.")
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      setState(await window.aetherion.accounts.addMicrosoft())
+    } catch (e) {
+      setError(readableError(e, "Microsoft sign-in failed."))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+        <p className="text-sm font-medium text-foreground">Microsoft</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Used to play and to own your servers. Stays on this computer.
+        </p>
+        <Button
+          type="button"
+          onClick={() => void handleMicrosoft()}
+          disabled={busy}
+          className="mt-3 bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          Sign in with Microsoft
+        </Button>
+      </div>
+
+      <div className="rounded-xl border border-white/10 bg-white/3 p-4">
         <p className="text-sm font-medium text-foreground">Player name</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
           Used in game. Saved only on this computer.
@@ -182,7 +210,7 @@ export function AccountTab() {
                       {acc.username}
                     </p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground font-mono truncate">
-                      {acc.uuid}
+                      {acc.type === "microsoft" ? "Microsoft" : "Offline"} · {acc.uuid}
                     </p>
                   </div>
 

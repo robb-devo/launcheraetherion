@@ -17,6 +17,24 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  async function handleMicrosoft() {
+    if (busy) return
+    if (!window.aetherion?.accounts) {
+      setError("Microsoft sign-in runs in the desktop launcher.")
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await window.aetherion.accounts.addMicrosoft()
+      router.push("/launcher")
+    } catch (e) {
+      setError(readableError(e, "Microsoft sign-in failed."))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (busy) return
@@ -64,8 +82,8 @@ export function LoginForm() {
               <span className="text-primary">Forge your legend.</span>
             </p>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-foreground/70">
-              Enter your name, then press play. The launcher prepares the realm
-              and starts the game.
+              Sign in with Microsoft, then press play. The launcher prepares the
+              realm and starts the game.
             </p>
           </div>
         </div>
@@ -83,10 +101,25 @@ export function LoginForm() {
         <div className="aetherion-rise w-full max-w-sm">
           <h1 className="font-serif text-3xl tracking-[0.12em] text-foreground">Enter</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your name is saved only on this computer.
+            Microsoft is the way in. An offline name is optional and stays on this computer.
           </p>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+          <Button
+            type="button"
+            disabled={busy}
+            onClick={() => void handleMicrosoft()}
+            className="mt-8 h-11 w-full gap-2 bg-primary font-serif tracking-[0.16em] text-primary-foreground hover:bg-primary/90 aetherion-gold-glow aetherion-sheen"
+          >
+            {busy ? "WAITING..." : "SIGN IN WITH MICROSOFT"}
+          </Button>
+
+          <div className="my-6 flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            <span className="h-px flex-1 bg-white/10" />
+            or offline
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
             <Field>
               <FieldLabel htmlFor="username" className="aetherion-kicker">
                 Player name

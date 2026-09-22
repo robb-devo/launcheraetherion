@@ -1,4 +1,7 @@
 const { app, BrowserWindow, dialog, ipcMain, protocol, shell } = require("electron")
+const controlApi = require("./lib/control.cjs")
+const microsoftAuth = require("./lib/microsoft.cjs")
+const { probeRealm } = require("./lib/realm-status.cjs")
 const { spawn } = require("node:child_process")
 const crypto = require("node:crypto")
 const fsSync = require("node:fs")
@@ -17,7 +20,6 @@ const MOJANG_VERSION_MANIFEST =
 const MINECRAFT_RESOURCES_BASE = "https://resources.download.minecraft.net"
 const DEFAULT_REMOTE_MANIFEST_URL =
   "https://raw.githubusercontent.com/washryan/launcheraetherion/main/public/manifest.json"
-const MINECRAFT_START_GRACE_MS = 45000
 const APP_PROTOCOL = "aetherion"
 const LAUNCH_TARGET = {
   minecraft: "1.19.2",
@@ -73,6 +75,14 @@ let activeMinecraftProcess = null
 let activeMinecraftDetached = true
 
 app.setName("Aetherion Launcher")
+if (process.platform === "win32") {
+  app.setAppUserModelId("gg.aetherion.launcher")
+}
+microsoftAuth.configure({
+  getMainWindow: () => mainWindow,
+  userDataPath: () => app.getPath("userData"),
+  iconPath: () => appIconPath(),
+})
 protocol.registerSchemesAsPrivileged([
   {
     scheme: APP_PROTOCOL,
@@ -255,6 +265,7 @@ ipcMain.handle("accounts:remove", async (_event, id) => {
   const activeId = state.activeId === id ? accounts[0]?.id ?? null : state.activeId
   const next = { activeId, accounts }
   await writeAccountsState(next)
+  await microsoftAuth.deleteSecret(id)
   return next
 })
 ipcMain.handle("accounts:setActive", async (_event, id) => {
@@ -269,9 +280,42 @@ ipcMain.handle("accounts:setActive", async (_event, id) => {
 })
 ipcMain.handle("accounts:getDataPath", () => accountsPath())
 
-ipcMain.handle("accounts:addMicrosoft", () => {
-  throw new Error("Microsoft sign-in is not available in this build yet.")
+ipcMain.handle("accounts:addMicrosoft", async () => {
+  const account = await microsoftAuth.loginMicrosoft()
+  const state = await readAccountsState()
+  const accounts = state.accounts.filter((candidate) => candidate.id !== account.id)
+  const next = { activeId: account.id, accounts: [...accounts, account] }
+  await writeAccountsState(next)
+  return next
 })
+
+ipcMain.handle("status:realm", async () => {
+  return probeRealm(AETHERION_SERVER_HOST, 25565)
+})
+
+async function microsoftPlayerId() {
+  const state = await readAccountsState()
+  const account =
+    state.accounts.find((candidate) => candidate.id === state.activeId && candidate.type === "microsoft") ||
+    state.accounts.find((candidate) => candidate.type === "microsoft")
+  if (!account) throw new Error("Sign in with Microsoft before using sandboxes.")
+  return account.uuid
+}
+
+ipcMain.handle("sandbox:options", async () => controlApi.sandboxOptions(await microsoftPlayerId()))
+ipcMain.handle("sandbox:list", async () => controlApi.sandboxList(await microsoftPlayerId()))
+ipcMain.handle("sandbox:create", async (_event, input) =>
+  controlApi.sandboxCreate(await microsoftPlayerId(), input),
+)
+ipcMain.handle("sandbox:start", async (_event, id) =>
+  controlApi.sandboxStart(await microsoftPlayerId(), id),
+)
+ipcMain.handle("sandbox:stop", async (_event, id) =>
+  controlApi.sandboxStop(await microsoftPlayerId(), id),
+)
+ipcMain.handle("sandbox:remove", async (_event, id) =>
+  controlApi.sandboxDelete(await microsoftPlayerId(), id),
+)
 
 ipcMain.handle("settings:get", () => readLauncherSettings())
 ipcMain.handle("settings:update", async (_event, patch) => {
@@ -579,11 +623,16 @@ function sanitizeAccountsState(value) {
           )
         })
         .map((account) => ({
-          ...account,
+          id: account.id,
+          type: account.type,
+          username: account.username,
+          uuid: account.uuid,
           avatarUrl:
             account.type === "offline" && isGeneratedAvatarUrl(account.avatarUrl)
               ? minecraftHeadUrl(account.username)
               : account.avatarUrl || minecraftHeadUrl(account.username),
+          addedAt: account.addedAt,
+          lastUsedAt: account.lastUsedAt,
         }))
     : []
 
@@ -846,6 +895,19 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
     throw new Error(`Profile ${profileId} does not include a mainClass, so Minecraft cannot start.`)
   }
   const account = await getLaunchAccount(args?.accountId)
+  const session = await microsoftAuth.sessionForAccount(account)
+  if (session.profile && session.profile.username !== account.username) {
+    const state = await readAccountsState()
+    const next = {
+      ...state,
+      accounts: state.accounts.map((candidate) =>
+        candidate.id === account.id
+          ? { ...candidate, username: session.profile.username, lastUsedAt: new Date().toISOString() }
+          : candidate,
+      ),
+    }
+    await writeAccountsState(next)
+  }
   const java = await resolveJavaForSettings(
     args?.java,
     manifest.java?.minMajor || 17,
@@ -869,18 +931,18 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
     : libraryPlan.classpath
   const assetPlan = await collectAssetPlan(root, parentProfile.assetIndex)
   const variables = {
-    auth_player_name: account.username,
+    auth_player_name: session.name,
     version_name: profileId,
     game_directory: root,
     assets_root: assetsRoot,
     assets_index_name: parentProfile.assetIndex?.id || parentId,
     resolution_width: args?.width || 1280,
     resolution_height: args?.height || 720,
-    auth_uuid: account.uuid.replace(/-/g, ""),
-    auth_access_token: "0",
+    auth_uuid: session.uuid,
+    auth_access_token: session.accessToken,
     clientid: "",
-    auth_xuid: "",
-    user_type: account.type === "microsoft" ? "msa" : "legacy",
+    auth_xuid: session.xuid || "",
+    user_type: session.userType,
     version_type: forgeProfile.type || parentProfile.type || "release",
     natives_directory: nativesDirectory,
     launcher_name: LAUNCHER_NAME,
@@ -904,9 +966,25 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
   const gameArgs = resolveArguments(merged.arguments.game, variables, {
     has_custom_resolution: true,
   })
+  const directHost = String(args?.serverHost || "").trim()
+  const directPort = Number(args?.serverPort)
   if (args?.fullscreen) gameArgs.push("--fullscreen")
-  if (args?.autoConnectServer) gameArgs.push("--server", AETHERION_SERVER_HOST)
-  await ensureMinecraftServerList(root)
+  if (directHost) {
+    gameArgs.push("--server", directHost)
+    if (Number.isInteger(directPort) && directPort > 0) gameArgs.push("--port", String(directPort))
+  } else if (args?.autoConnectServer) {
+    gameArgs.push("--server", AETHERION_SERVER_HOST)
+  }
+  await ensureMinecraftServerList(
+    root,
+    directHost
+      ? {
+          name: String(args?.serverName || "Aetherion Sandbox"),
+          host: directHost,
+          port: Number.isInteger(directPort) ? directPort : 25565,
+        }
+      : null,
+  )
   const commandArgs = [...jvmArgs, merged.mainClass, ...gameArgs]
   const assetIndexPath = path.join(assetsRoot, "indexes", `${variables.assets_index_name}.json`)
   const missing = [
@@ -997,7 +1075,7 @@ async function startMinecraft(launchPlan, signal) {
 
   emitLaunchProgress({
     phase: "launching",
-    message: "Starting Minecraft...",
+    message: "Launching Minecraft...",
   })
 
   console.log("[aetherion] starting minecraft", {
@@ -1031,14 +1109,20 @@ async function startMinecraft(launchPlan, signal) {
     if (lastLine) console.log("[minecraft]", lastLine)
   }
 
-  child.stdout.on("data", writeLog)
-  child.stderr.on("data", writeLog)
+  const runningMark = /Setting user:|LWJGL Version|OpenAL|Sound engine started|Backend library:/i
+  const watchLog = (chunk) => {
+    writeLog(chunk)
+    if (runningMark.test(chunk.toString())) markRunning()
+  }
+  child.stdout.on("data", watchLog)
+  child.stderr.on("data", watchLog)
 
   const abort = () => {
     if (!child.killed) child.kill()
   }
   signal?.addEventListener("abort", abort, { once: true })
 
+  let markRunning = () => {}
   const processInfo = await new Promise((resolve, reject) => {
     let settled = false
     const settle = (fn, value) => {
@@ -1048,10 +1132,16 @@ async function startMinecraft(launchPlan, signal) {
       signal?.removeEventListener("abort", abort)
       fn(value)
     }
-    const startedTimer = setTimeout(() => {
+    markRunning = () => {
+      if (settled || child.killed || child.exitCode != null) return
       if (launchPlan.detachProcess) child.unref()
+      emitLaunchProgress({
+        phase: "running",
+        message: `Minecraft is running (PID ${child.pid}).`,
+      })
       settle(resolve, { pid: child.pid, logPath })
-    }, MINECRAFT_START_GRACE_MS)
+    }
+    const startedTimer = setTimeout(markRunning, 8000)
 
     child.on("error", (error) => {
       settle(reject, error)
@@ -1142,7 +1232,7 @@ async function readTail(filePath, maxLines) {
     .join("\n")
 }
 
-async function ensureMinecraftServerList(root) {
+async function ensureMinecraftServerList(root, extra) {
   const serversPath = path.join(root, "servers.dat")
   let rootTag = null
   let compressed = true
@@ -1179,18 +1269,34 @@ async function ensureMinecraftServerList(root) {
   }
 
   const list = rootTag.value.servers.value.value
-  const hasAetherion = list.some((server) => {
-    const ip = String(server?.ip?.value || "").toLowerCase()
-    return ip === AETHERION_SERVER_HOST.toLowerCase()
-  })
-  if (hasAetherion) return
+  const wanted = [{ name: AETHERION_SERVER_NAME, ip: AETHERION_SERVER_HOST }]
+  if (extra?.host) {
+    const port = Number(extra.port)
+    const ip = Number.isInteger(port) && port > 0 && port !== 25565 ? `${extra.host}:${port}` : extra.host
+    wanted.push({ name: extra.name || "Aetherion Sandbox", ip })
+  }
 
-  list.unshift({
-    name: { type: 8, value: AETHERION_SERVER_NAME },
-    ip: { type: 8, value: AETHERION_SERVER_HOST },
-    acceptTextures: { type: 1, value: 1 },
-  })
+  let changed = false
+  for (const entry of wanted) {
+    const key = entry.ip.toLowerCase()
+    const index = list.findIndex((server) => String(server?.ip?.value || "").toLowerCase() === key)
+    const tag = {
+      name: { type: 8, value: entry.name },
+      ip: { type: 8, value: entry.ip },
+      acceptTextures: { type: 1, value: 1 },
+    }
+    if (index >= 0) {
+      if (list[index]?.name?.value !== entry.name) {
+        list[index] = { ...list[index], ...tag }
+        changed = true
+      }
+    } else {
+      list.unshift(tag)
+      changed = true
+    }
+  }
 
+  if (!changed && fsSync.existsSync(serversPath)) return
   await fs.writeFile(serversPath, encodeMaybeCompressedNbt(rootTag, compressed))
 }
 
