@@ -5,6 +5,8 @@
 
 const DEFAULT_API_BASE = "http://135.181.18.162:5055"
 const BAKED_SERVICE_KEY = "aetherion-launcher-friend-v1"
+const UNAVAILABLE = "Sandbox API is temporarily unavailable."
+const SIGN_IN = "Sign in with Microsoft before using sandboxes."
 
 function apiBase() {
   const fromEnv = String(process.env.AETHERION_API_BASE || "").trim()
@@ -32,6 +34,14 @@ function playerHeader(playerId) {
 function apiUrl(pathname) {
   const path = pathname.startsWith("/") ? pathname : `/${pathname}`
   return `${apiBase()}/api${path}`
+}
+
+function failureMessage(status, data) {
+  const raw = typeof data?.error === "string" ? data.error.trim() : ""
+  if (status === 401 && /sign in with microsoft/i.test(raw)) return SIGN_IN
+  if (status === 401 || status === 403 || status >= 500) return UNAVAILABLE
+  if (/bearer|credential|service key|friend key|access code/i.test(raw)) return UNAVAILABLE
+  return raw || `Request failed (HTTP ${status}).`
 }
 
 async function readBody(response) {
@@ -63,11 +73,7 @@ async function api(pathname, { method = "GET", body, playerId } = {}) {
   }
   const data = await readBody(response)
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403 || response.status >= 500) {
-      throw new Error("Sandbox API is temporarily unavailable.")
-    }
-    const raw = data?.error || `Request failed (HTTP ${response.status}).`
-    throw new Error(raw)
+    throw new Error(failureMessage(response.status, data))
   }
   return data
 }
@@ -98,9 +104,13 @@ function sandboxDelete(playerId, id) {
 
 module.exports = {
   DEFAULT_API_BASE,
+  BAKED_SERVICE_KEY,
+  UNAVAILABLE,
   apiBase,
+  serviceKey,
   playerHeader,
   apiUrl,
+  failureMessage,
   sandboxOptions,
   sandboxList,
   sandboxCreate,

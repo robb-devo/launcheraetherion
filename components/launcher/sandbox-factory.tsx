@@ -77,11 +77,13 @@ export function SandboxFactory() {
       window.aetherion.sandbox.options(),
       window.aetherion.sandbox.list(),
     ])
+    const allowed = new Set(["vanilla", "paper", "fabric", "purpur"])
+    const serverTypes = (nextOptions.serverTypes || []).filter((item) => allowed.has(item.value))
     setOptions({
       ...EMPTY_OPTIONS,
       ...nextOptions,
       presets: nextOptions.presets?.length ? nextOptions.presets : SANDBOX_PRESETS,
-      serverTypes: nextOptions.serverTypes?.length ? nextOptions.serverTypes : SANDBOX_TYPES,
+      serverTypes: serverTypes.length ? serverTypes : SANDBOX_TYPES,
       versions: nextOptions.versions || {},
     })
     setServers(list.servers || [])
@@ -97,8 +99,9 @@ export function SandboxFactory() {
       return
     }
     const clean = name.trim()
-    if (clean.length < 2) {
-      setError("Name the server with at least 2 characters.")
+    const cleaned = clean.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "")
+    if (cleaned.length < 2 || cleaned.length > 24) {
+      setError("Name must be 2–24 chars (letters, numbers, hyphens).")
       return
     }
     if (!selectedVersion) {

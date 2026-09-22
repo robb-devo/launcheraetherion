@@ -1,4 +1,4 @@
-export type SandboxType = "vanilla" | "paper" | "fabric" | "purpur" | "forge"
+export type SandboxType = "vanilla" | "paper" | "fabric" | "purpur"
 export type SandboxPreset = "light" | "balanced" | "performance" | "max" | "custom"
 
 export interface SandboxPresetOption {
