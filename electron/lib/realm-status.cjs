@@ -1,6 +1,6 @@
 const net = require("node:net")
 
-const STATUS_PROTOCOL = 760
+const STATUS_PROTOCOL = 767
 
 function writeVarInt(value) {
   const bytes = []
@@ -119,24 +119,8 @@ function pingMinecraft(host, port, timeoutMs = 4000) {
   })
 }
 
-async function probeMojang(timeoutMs = 4000) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const response = await fetch("https://sessionserver.mojang.com/", {
-      method: "GET",
-      signal: controller.signal,
-    })
-    return response.status < 500 ? "online" : "unknown"
-  } catch {
-    return "unknown"
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
 async function probeRealm(host, port = 25565) {
-  const [realm, mojang] = await Promise.all([pingMinecraft(host, port), probeMojang()])
+  const realm = await pingMinecraft(host, port)
   return {
     host,
     port,
@@ -145,7 +129,6 @@ async function probeRealm(host, port = 25565) {
     players: realm.players || null,
     ping: Number.isFinite(realm.ping) ? realm.ping : null,
     motd: realm.motd || null,
-    mojang,
   }
 }
 

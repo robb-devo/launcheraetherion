@@ -3,17 +3,12 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { AlertCircle, ArrowRight, User, X } from "lucide-react"
+import { AlertCircle, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { addOfflineAccount, validateOfflineUsername } from "@/lib/launcher/accounts"
-import type { AccountsState } from "@/lib/launcher/types"
 import { AetherionMark } from "./aetherion-mark"
 
 export function LoginForm() {
   const router = useRouter()
-  const [username, setUsername] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -35,34 +30,6 @@ export function LoginForm() {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (busy) return
-
-    const validation = validateOfflineUsername(username)
-    if (validation) {
-      setError(validation)
-      return
-    }
-
-    setBusy(true)
-    setError(null)
-
-    try {
-      if (window.aetherion?.accounts) {
-        await window.aetherion.accounts.addOffline(username)
-      } else {
-        const previewState: AccountsState = { activeId: null, accounts: [] }
-        await addOfflineAccount(previewState, username)
-      }
-      router.push("/launcher")
-    } catch (e) {
-      setError(readableError(e, "Could not save that name."))
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
     <div className="grid h-full w-full grid-cols-12">
       <div className="relative col-span-5 overflow-hidden border-r border-white/8 bg-[url('/aetherion-bg.jpg')] bg-cover bg-[center_40%]">
@@ -79,7 +46,7 @@ export function LoginForm() {
             <p className="mt-3 font-serif text-[2rem] leading-[1.15] text-balance text-foreground drop-shadow-[0_8px_24px_rgba(0,0,0,0.7)]">
               Cross the veil.
               <br />
-              <span className="text-primary">Forge your legend.</span>
+              <span className="text-primary">Step into the realm.</span>
             </p>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-foreground/70">
               Sign in with Microsoft, then press play. The launcher prepares the
@@ -101,7 +68,7 @@ export function LoginForm() {
         <div className="aetherion-rise w-full max-w-sm">
           <h1 className="font-serif text-3xl tracking-[0.12em] text-foreground">Enter</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Microsoft is the way in. An offline name is optional and stays on this computer.
+            Microsoft is the way in. The launcher uses that profile to play.
           </p>
 
           <Button
@@ -113,54 +80,12 @@ export function LoginForm() {
             {busy ? "WAITING..." : "SIGN IN WITH MICROSOFT"}
           </Button>
 
-          <div className="my-6 flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            <span className="h-px flex-1 bg-white/10" />
-            or offline
-            <span className="h-px flex-1 bg-white/10" />
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Field>
-              <FieldLabel htmlFor="username" className="aetherion-kicker">
-                Player name
-              </FieldLabel>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                <Input
-                  id="username"
-                  value={username}
-                  onChange={(e) => {
-                    setUsername(e.target.value)
-                    setError(null)
-                  }}
-                  placeholder="Steve"
-                  className="h-11 border-white/10 bg-white/4 pl-10"
-                  required
-                  minLength={3}
-                  maxLength={16}
-                />
-              </div>
-              <FieldDescription className="text-[11px]">
-                Use 3 to 16 characters. No password is asked for or sent.
-              </FieldDescription>
-            </Field>
-
-            {error && (
-              <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3">
-                <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
-                <p className="text-xs text-foreground/90 leading-relaxed">{error}</p>
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              disabled={busy}
-              className="mt-6 h-11 w-full gap-2 bg-primary font-serif tracking-[0.2em] text-primary-foreground hover:bg-primary/90 aetherion-gold-glow aetherion-sheen"
-            >
-              {busy ? "SAVING..." : "CONTINUE"}
-              <ArrowRight className="size-4" />
-            </Button>
-          </form>
+          {error && (
+            <div className="mt-4 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3">
+              <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
+              <p className="text-xs text-foreground/90 leading-relaxed">{error}</p>
+            </div>
+          )}
 
           <p className="mt-8 text-center text-[11px] leading-relaxed text-muted-foreground/80">
             Aetherion does not store account data on its own servers.

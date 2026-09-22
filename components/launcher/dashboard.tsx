@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Cog, Globe, LogIn, Play, Server, Youtube } from "lucide-react"
+import { Cog, Globe, LogIn, Play, Server } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { DEFAULT_SETTINGS, MOCK_MANIFEST } from "@/lib/launcher/mock-data"
+import { DEFAULT_SETTINGS, CLIENT_PACK, PACK_LABEL } from "@/lib/launcher/mock-data"
+import { DISCORD_URL, WEBSITE_URL } from "@/lib/launcher/social"
 import type { Account, LauncherSettings, LaunchProgress } from "@/lib/launcher/types"
 import { publicAssetPath } from "@/lib/public-path"
 import { LAUNCHER_VERSION } from "@/lib/launcher/version"
@@ -18,14 +19,12 @@ type RealmStatus = {
   state: "online" | "offline" | "unknown"
   players: { current: number; max: number } | null
   ping: number | null
-  mojang: "online" | "unknown"
 }
 
 const UNKNOWN_REALM: RealmStatus = {
   state: "unknown",
   players: null,
   ping: null,
-  mojang: "unknown",
 }
 
 export function Dashboard() {
@@ -77,7 +76,6 @@ export function Dashboard() {
           state: status.state,
           players: status.players,
           ping: status.ping,
-          mojang: status.mojang,
         }),
       )
       .catch(() => setRealm(UNKNOWN_REALM))
@@ -103,7 +101,7 @@ export function Dashboard() {
     try {
       await window.aetherion.launch.start({
         accountId: activeAccount.id,
-        instanceId: MOCK_MANIFEST.instanceId ?? "aetherion-main",
+        instanceId: CLIENT_PACK.id,
         fullscreen: settings.minecraft.fullscreen,
         width: settings.minecraft.resolution.width,
         height: settings.minecraft.resolution.height,
@@ -180,7 +178,7 @@ export function Dashboard() {
               AETHERION
             </p>
             <p className="mt-3 text-sm text-foreground/70">
-              {MOCK_MANIFEST.minecraft} · Forge {MOCK_MANIFEST.forge.version}
+              {PACK_LABEL}
             </p>
           </div>
         </div>
@@ -203,12 +201,20 @@ export function Dashboard() {
               />
               <span className="hidden h-8 w-px bg-white/10 sm:block" aria-hidden />
               <StatusBlock
-                label="Mojang"
-                value={realm.mojang === "online" ? "Online" : "Unknown"}
+                label="AETHERION"
+                value={
+                  realm.state === "online"
+                    ? "Online"
+                    : realm.state === "offline"
+                      ? "Offline"
+                      : "Unknown"
+                }
                 dotClass={
-                  realm.mojang === "online"
+                  realm.state === "online"
                     ? "bg-primary text-primary"
-                    : "bg-muted-foreground text-muted-foreground"
+                    : realm.state === "offline"
+                      ? "bg-destructive text-destructive"
+                      : "bg-muted-foreground text-muted-foreground"
                 }
               />
               <span className="hidden h-8 w-px bg-white/10 sm:block" aria-hidden />
@@ -230,25 +236,26 @@ export function Dashboard() {
               <IconLink href="/settings/account" label="Settings">
                 <Cog className="size-4" />
               </IconLink>
-              <IconLink href="#" label="Site">
-                <Globe className="size-4" />
-              </IconLink>
-              <IconLink href="#" label="YouTube">
-                <Youtube className="size-4" />
-              </IconLink>
-              <IconLink href="#" label="Discord">
-                <DiscordMark />
-              </IconLink>
+              {WEBSITE_URL ? (
+                <IconLink href={WEBSITE_URL} label="Site">
+                  <Globe className="size-4" />
+                </IconLink>
+              ) : null}
+              {DISCORD_URL ? (
+                <IconLink href={DISCORD_URL} label="Discord">
+                  <DiscordMark />
+                </IconLink>
+              ) : null}
             </div>
 
             <div className="col-span-4 flex items-center justify-end gap-4">
               <div className="text-right">
                 <p className="aetherion-kicker">Instance</p>
                 <p className="mt-1 text-sm font-medium text-foreground">
-                  {MOCK_MANIFEST.name}
+                  {CLIENT_PACK.name}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {MOCK_MANIFEST.minecraft} · v{MOCK_MANIFEST.version}
+                  {PACK_LABEL}
                 </p>
               </div>
 
@@ -312,12 +319,17 @@ function IconLink({
   label: string
   children: React.ReactNode
 }) {
+  const className =
+    "inline-flex size-9 items-center justify-center rounded-lg border border-white/10 bg-white/4 text-muted-foreground transition duration-200 hover:-translate-y-px hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+  if (href.startsWith("http")) {
+    return (
+      <a href={href} target="_blank" rel="noreferrer" aria-label={label} className={className}>
+        {children}
+      </a>
+    )
+  }
   return (
-    <Link
-      href={href}
-      aria-label={label}
-      className="inline-flex size-9 items-center justify-center rounded-lg border border-white/10 bg-white/4 text-muted-foreground transition duration-200 hover:-translate-y-px hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-    >
+    <Link href={href} aria-label={label} className={className}>
       {children}
     </Link>
   )

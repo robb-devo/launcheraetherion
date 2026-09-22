@@ -5,7 +5,7 @@ export default function AccountPage() {
   return (
     <SettingsPage
       title="Account settings"
-      description="Sign in with Microsoft to play and to own servers. An offline name is optional."
+      description="Sign in with Microsoft to play and to own servers."
     >
       <AccountTab />
     </SettingsPage>

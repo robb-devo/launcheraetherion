@@ -77,7 +77,7 @@ declare global {
           players: { current: number; max: number } | null
           ping: number | null
           motd: string | null
-          mojang: "online" | "unknown"
+          mojang?: "online" | "unknown"
         }>
       }
       sandbox: {

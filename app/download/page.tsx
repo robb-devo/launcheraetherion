@@ -10,17 +10,14 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { AetherionMark } from "@/components/launcher/aetherion-mark"
-import { MOCK_MANIFEST } from "@/lib/launcher/mock-data"
+import { CLIENT_PACK, REQUIRED_MODS } from "@/lib/launcher/mock-data"
+import { DISCORD_URL } from "@/lib/launcher/social"
 import { launcherDownloadUrl, releasePageUrl } from "@/lib/launcher/github-releases"
 import { LAUNCHER_VERSION } from "@/lib/launcher/version"
 
 const WINDOWS_INSTALLER_FILENAME = `Aetherion.Launcher.Setup.${LAUNCHER_VERSION}.exe`
 const LAUNCHER_REPO = {
   owner: "robb-devo",
-  repo: "launcheraetherion",
-}
-const MODPACK_REPO = {
-  owner: "washryan",
   repo: "launcheraetherion",
 }
 
@@ -30,10 +27,6 @@ const WINDOWS_DOWNLOAD_URL = launcherDownloadUrl(
   LAUNCHER_REPO,
 )
 const LAUNCHER_RELEASE_URL = releasePageUrl(LAUNCHER_VERSION, LAUNCHER_REPO)
-const MODPACK_RELEASE_URL = releasePageUrl(MOCK_MANIFEST.version, MODPACK_REPO)
-const REQUIRED_MODS = MOCK_MANIFEST.files.filter((file) => file.type === "required")
-const OPTIONAL_MODS = MOCK_MANIFEST.files.filter((file) => file.type === "optional")
-const FEATURED_MODS = REQUIRED_MODS.slice(0, 12)
 
 export default function DownloadPage() {
   return (
@@ -53,13 +46,15 @@ export default function DownloadPage() {
             </div>
           </div>
           <nav className="flex items-center gap-4 text-sm">
-            <a
-              href={MOCK_MANIFEST.endpoints?.discord}
-              className="text-muted-foreground hover:text-foreground transition inline-flex items-center gap-1.5"
-            >
-              <MessageCircle className="size-4" />
-              Discord
-            </a>
+            {DISCORD_URL ? (
+              <a
+                href={DISCORD_URL}
+                className="text-muted-foreground hover:text-foreground transition inline-flex items-center gap-1.5"
+              >
+                <MessageCircle className="size-4" />
+                Discord
+              </a>
+            ) : null}
             <a
               href={LAUNCHER_RELEASE_URL}
               className="text-muted-foreground hover:text-foreground transition"
@@ -75,7 +70,7 @@ export default function DownloadPage() {
           variant="outline"
           className="mb-6 border-primary/40 text-[10px] uppercase tracking-[0.22em] text-primary"
         >
-          Windows x64 • Minecraft {MOCK_MANIFEST.minecraft} • Forge {MOCK_MANIFEST.forge.version}
+          Windows x64 • Minecraft {CLIENT_PACK.minecraft} • Fabric {CLIENT_PACK.loader.version}
         </Badge>
         <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
           <div>
@@ -83,8 +78,8 @@ export default function DownloadPage() {
               AETHERION
             </h1>
             <p className="mt-5 text-lg text-muted-foreground max-w-2xl text-balance">
-              Download the official Windows launcher, sign in with a local account, and play
-              with Forge, mods, shaders, Java, and integrity checks prepared by Aetherion.
+              Download the official Windows launcher, sign in with Microsoft, and play
+              Minecraft {CLIENT_PACK.minecraft} with Fabric.
             </p>
 
             <div className="mt-10 flex flex-col sm:flex-row gap-3">
@@ -105,7 +100,7 @@ export default function DownloadPage() {
             </div>
 
             <p className="mt-4 text-xs text-muted-foreground">
-              Launcher v{LAUNCHER_VERSION} • Modpack v{MOCK_MANIFEST.version} •{" "}
+              Launcher v{LAUNCHER_VERSION} • Pack v{CLIENT_PACK.version} •{" "}
               {WINDOWS_INSTALLER_FILENAME}
             </p>
           </div>
@@ -116,8 +111,8 @@ export default function DownloadPage() {
               <DownloadRow label="System" value="Windows 10/11 x64" />
               <DownloadRow label="File" value={WINDOWS_INSTALLER_FILENAME} />
               <DownloadRow label="Installer" value="NSIS, shortcut, and uninstaller" />
-              <DownloadRow label="Modpack" value={`${REQUIRED_MODS.length} required`} />
-              <DownloadRow label="Optional" value={`${OPTIONAL_MODS.length} selectable`} />
+              <DownloadRow label="Pack" value={`${REQUIRED_MODS.length} mods`} />
+              <DownloadRow label="Server" value="play.donnernet.de" />
             </div>
           </div>
         </div>
@@ -138,7 +133,7 @@ export default function DownloadPage() {
           <Feature
             icon={<Server className="size-5" />}
             title="Server ready"
-            description="Startup can connect straight to left-fcc.gl.joinmc.link."
+            description="Startup can connect straight to play.donnernet.de."
           />
         </div>
       </section>
@@ -148,15 +143,12 @@ export default function DownloadPage() {
           <div>
             <h2 className="font-serif text-2xl tracking-wide">Included modpack</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Required mods stay locked. Optional mods can be toggled in settings.
+              Minecraft {CLIENT_PACK.minecraft}, Fabric {CLIENT_PACK.loader.version}.
             </p>
           </div>
-          <a href={MODPACK_RELEASE_URL} className="text-sm text-primary hover:underline">
-            Modpack assets
-          </a>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURED_MODS.map((mod) => (
+          {REQUIRED_MODS.map((mod) => (
             <div key={mod.path} className="rounded-xl border border-white/8 bg-card/50 p-4">
               <div className="flex items-start gap-3">
                 <Package className="size-4 text-primary mt-0.5 shrink-0" />
@@ -168,42 +160,7 @@ export default function DownloadPage() {
             </div>
           ))}
         </div>
-        <div className="mt-5 flex flex-wrap gap-2">
-          {OPTIONAL_MODS.map((mod) => (
-            <Badge
-              key={mod.path}
-              variant="outline"
-              className="border-primary/30 text-primary bg-primary/5"
-            >
-              {mod.name}
-            </Badge>
-          ))}
-        </div>
       </section>
-
-      {MOCK_MANIFEST.changelog && (
-        <section className="max-w-5xl mx-auto px-6 pb-16">
-          <div className="flex items-baseline justify-between mb-6">
-            <h2 className="font-serif text-2xl tracking-wide">Changelog</h2>
-            <a href={MODPACK_RELEASE_URL} className="text-sm text-primary hover:underline">
-              GitHub
-            </a>
-          </div>
-          <div className="aetherion-glass rounded-2xl p-6">
-            <p className="font-serif text-lg tracking-wide">
-              v{MOCK_MANIFEST.version}{" "}
-              <span className="text-muted-foreground text-sm font-sans">
-                •{" "}
-                {MOCK_MANIFEST.publishedAt &&
-                  new Date(MOCK_MANIFEST.publishedAt).toLocaleDateString("en-US")}
-              </span>
-            </p>
-            <pre className="mt-3 text-sm text-muted-foreground whitespace-pre-wrap font-sans leading-relaxed">
-              {MOCK_MANIFEST.changelog}
-            </pre>
-          </div>
-        </section>
-      )}
 
       <footer className="border-t border-border/40">
         <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -217,12 +174,11 @@ export default function DownloadPage() {
             >
               GitHub
             </a>
-            <a href={MOCK_MANIFEST.endpoints?.discord} className="hover:text-foreground">
-              Discord
-            </a>
-            <a href={MOCK_MANIFEST.endpoints?.youtube} className="hover:text-foreground">
-              YouTube
-            </a>
+            {DISCORD_URL ? (
+              <a href={DISCORD_URL} className="hover:text-foreground">
+                Discord
+              </a>
+            ) : null}
           </div>
         </div>
       </footer>

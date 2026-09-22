@@ -87,7 +87,7 @@ export interface Manifest {
   publishedAt?: string
 
   /** Forge installer — baixado para /forge/ e executado no primeiro run */
-  forge: ForgeEntry
+  forge?: ForgeEntry
 
   /** Todos os arquivos do modpack (mods, configs, resourcepacks) */
   files: ManifestFile[]

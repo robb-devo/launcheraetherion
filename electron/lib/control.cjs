@@ -58,18 +58,15 @@ async function api(pathname, { method = "GET", body, playerId } = {}) {
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    throw new Error(`Control API is unreachable (${message}).`)
+  } catch {
+    throw new Error("Sandbox API is temporarily unavailable.")
   }
   const data = await readBody(response)
   if (!response.ok) {
-    const raw = data?.error || `Request failed (HTTP ${response.status}).`
-    if (response.status === 401 || response.status === 403) {
-      throw new Error(
-        "The control API refused this launcher. Sandbox access needs the friend credential accepted on the server.",
-      )
+    if (response.status === 401 || response.status === 403 || response.status >= 500) {
+      throw new Error("Sandbox API is temporarily unavailable.")
     }
+    const raw = data?.error || `Request failed (HTTP ${response.status}).`
     throw new Error(raw)
   }
   return data

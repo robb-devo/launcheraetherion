@@ -30,7 +30,7 @@ const PHASE_META: Record<
   "computing-plan": { label: "Computing differences", icon: Search },
   "checking-java": { label: "Checking Java", icon: Coffee },
   "downloading-java": { label: "Downloading Java runtime", icon: Download },
-  "installing-forge": { label: "Installing Forge", icon: Hammer },
+  "installing-forge": { label: "Installing Fabric", icon: Hammer },
   "downloading-files": { label: "Downloading mods and configs", icon: Download },
   verifying: { label: "Verifying integrity", icon: CheckCircle2 },
   launching: { label: "Starting Minecraft", icon: Rocket },

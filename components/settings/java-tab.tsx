@@ -137,7 +137,7 @@ export function JavaTab() {
 
       <SettingsSection
         title="Java executable"
-        description="The launcher checks the binary before the game starts. Use Java 17 or newer."
+        description="The launcher checks the binary before the game starts. Use Java 21."
       >
         <div className="space-y-4 rounded-2xl border border-white/8 bg-card/40 p-5">
           <div className="flex items-start gap-3">
@@ -149,8 +149,8 @@ export function JavaTab() {
                 {detectedJava ? `Java ${detectedJava.major} detected` : "Java not detected"}
               </p>
               <p className="text-xs text-muted-foreground">
-                Recommended for Minecraft {MOCK_MANIFEST_PREVIEW.minecraft} (Forge{" "}
-                {MOCK_MANIFEST_PREVIEW.forgeVersion}) - major &gt;= 17
+                Recommended for Minecraft {MOCK_MANIFEST_PREVIEW.minecraft} (Fabric{" "}
+                {MOCK_MANIFEST_PREVIEW.loaderVersion}) — Java 21
               </p>
               <p className="mt-1 text-[11px] text-muted-foreground font-mono">{status}</p>
             </div>
@@ -160,7 +160,7 @@ export function JavaTab() {
             <Coffee className="size-4 text-muted-foreground shrink-0" />
             <Input
               readOnly
-              value={java.executablePath || detectedJava?.path || "Auto-detect Java 17+"}
+              value={java.executablePath || detectedJava?.path || "Auto-detect Java 21"}
               className="flex-1 h-9 bg-input/40 font-mono text-xs"
             />
             <Button

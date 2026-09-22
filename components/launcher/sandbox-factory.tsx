@@ -17,7 +17,7 @@ import {
   type SandboxType,
 } from "@/lib/launcher/sandbox"
 import type { Account, LauncherSettings, LaunchProgress } from "@/lib/launcher/types"
-import { MOCK_MANIFEST } from "@/lib/launcher/mock-data"
+import { CLIENT_PACK } from "@/lib/launcher/mock-data"
 import { LaunchProgressOverlay } from "./launch-progress"
 
 const EMPTY_OPTIONS: SandboxOptions = {
@@ -161,7 +161,7 @@ export function SandboxFactory() {
     try {
       await window.aetherion.launch.start({
         accountId: account.id,
-        instanceId: MOCK_MANIFEST.instanceId ?? "aetherion-main",
+        instanceId: CLIENT_PACK.id,
         fullscreen: settings?.minecraft.fullscreen ?? false,
         width: settings?.minecraft.resolution.width ?? 1280,
         height: settings?.minecraft.resolution.height ?? 720,
@@ -214,7 +214,7 @@ export function SandboxFactory() {
               <Input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="friends"
+                placeholder="my-server"
                 maxLength={24}
                 className="mt-2 h-11 border-white/10 bg-white/4"
               />

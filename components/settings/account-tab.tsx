@@ -1,18 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AlertCircle, Check, Trash2 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import type { AccountsState } from "@/lib/launcher/types"
-import {
-  addOfflineAccount,
-  removeAccount as removeAccountLib,
-  setActiveAccount,
-  validateOfflineUsername,
-} from "@/lib/launcher/accounts"
+import { removeAccount as removeAccountLib, setActiveAccount } from "@/lib/launcher/accounts"
 import { publicAssetPath } from "@/lib/public-path"
 import { cn } from "@/lib/utils"
 
@@ -24,7 +18,6 @@ import { cn } from "@/lib/utils"
 export function AccountTab() {
   const router = useRouter()
   const [state, setState] = useState<AccountsState>({ activeId: null, accounts: [] })
-  const [username, setUsername] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -38,28 +31,6 @@ export function AccountTab() {
         setError(e instanceof Error ? e.message : "Could not load local accounts."),
       )
   }, [])
-
-  const validationError = useMemo(
-    () => (username ? validateOfflineUsername(username) : null),
-    [username],
-  )
-
-  async function handleAddOffline() {
-    if (busy) return
-    setError(null)
-    setBusy(true)
-    try {
-      const next = window.aetherion?.accounts
-        ? await window.aetherion.accounts.addOffline(username)
-        : await addOfflineAccount(state, username)
-      setState(next)
-      setUsername("")
-    } catch (e) {
-      setError(readableError(e, "Could not add the account."))
-    } finally {
-      setBusy(false)
-    }
-  }
 
   async function handleRemove(id: string) {
     setError(null)
@@ -124,45 +95,6 @@ export function AccountTab() {
         </Button>
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-white/3 p-4">
-        <p className="text-sm font-medium text-foreground">Player name</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Used in game. Saved only on this computer.
-        </p>
-
-        <div className="mt-3 flex gap-2">
-          <Input
-            autoFocus
-            placeholder="Name (3–16 characters)"
-            value={username}
-            onChange={(e) => {
-              setUsername(e.target.value)
-              setError(null)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !validationError) handleAddOffline()
-            }}
-            maxLength={16}
-            className="bg-input/40 font-mono"
-            aria-invalid={!!validationError}
-          />
-          <Button
-            onClick={handleAddOffline}
-            disabled={!username || !!validationError || busy}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            Add
-          </Button>
-        </div>
-
-        {validationError && (
-          <p className="mt-2 text-xs text-destructive flex items-center gap-1.5">
-            <AlertCircle className="size-3" />
-            {validationError}
-          </p>
-        )}
-      </div>
-
       {error && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 flex items-start gap-2">
           <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
@@ -178,12 +110,14 @@ export function AccountTab() {
         {state.accounts.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/60 p-8 text-center">
             <p className="text-sm text-muted-foreground">
-              No accounts yet. Add one above to get started.
+              No Microsoft accounts yet. Sign in above to play.
             </p>
           </div>
         ) : (
           <div className="space-y-2">
-            {state.accounts.map((acc) => {
+            {state.accounts
+              .filter((acc) => acc.type === "microsoft")
+              .map((acc) => {
               const active = acc.id === state.activeId
               return (
                 <div
@@ -210,7 +144,7 @@ export function AccountTab() {
                       {acc.username}
                     </p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground font-mono truncate">
-                      {acc.type === "microsoft" ? "Microsoft" : "Offline"} · {acc.uuid}
+                      Microsoft · {acc.uuid}
                     </p>
                   </div>
 

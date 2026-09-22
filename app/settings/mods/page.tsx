@@ -7,7 +7,7 @@ export default function ModsPage() {
   return (
     <SettingsPage
       title="Mods & Shaders"
-      description="Required mods follow the remote manifest. Optional and drop-in mods stay under your control."
+      description="Mods and the shaderpack from the Aetherion Fabric manifest."
       actions={
         <Badge
           variant="outline"
