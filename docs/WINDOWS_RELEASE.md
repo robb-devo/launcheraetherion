@@ -1,20 +1,20 @@
 # Publish the Windows launcher
 
-## Launcher 0.3.4 — visual polish, name then play
+## Launcher 0.3.7 — Minecraft 1.21.1 Fabric
 
-This build is the English visual polish. Castle art is a CSS background, the same way the original launcher loaded it. It does not check for launcher updates on startup. Entering a player name still calls `accounts:addOffline` and stores `accounts.json` under `%APPDATA%\Aetherion Launcher`. The login screen no longer offers the unimplemented Microsoft button. The modpack stays `v0.4`. See `docs/DATA_SAFETY.md`.
+This build keeps the 0.3.4 window, dashboard, and settings. Play installs the Fabric pack (loader 0.19.5), Java 21, and connects to `play.donnernet.de:25565`. Microsoft sign-in is required to play. Your server talks to the control API. See `docs/SANDBOX_API.md` and `README.md`.
 
-Players install `Aetherion.Launcher.Setup.0.3.4.exe`. NSIS upgrades the same app id (`gg.aetherion.launcher`) and leaves that AppData folder in place.
+Players install `Aetherion.Launcher.Setup.0.3.7.exe` once. That build checks GitHub Releases for `latest.yml` and installs newer versions inside the app. NSIS upgrades the same app id (`gg.aetherion.launcher`) and leaves the AppData folder in place. The taskbar id is the same app id, so the launcher is one button. The Microsoft window uses `skipTaskbar`.
 
 ### Version
 
 | Where | Value |
 | --- | --- |
-| `package.json` `version` | `0.3.4` |
+| `package.json` `version` | `0.3.7` |
 | Electron `LAUNCHER_VERSION` | read from `package.json` in `electron/main.cjs` |
 | `/download` and settings | `lib/launcher/version.ts` imports `package.json` |
-| NSIS artifact | `Aetherion.Launcher.Setup.0.3.4.exe` |
-| GitHub tag | `v0.3.4` |
+| NSIS artifact | `Aetherion.Launcher.Setup.0.3.7.exe` |
+| GitHub tag | `v0.3.7` |
 | Release repo | `robb-devo/launcheraetherion` |
 
 The tag and `package.json` version must match.
@@ -27,22 +27,25 @@ The tag and `package.json` version must match.
 ```powershell
 git checkout main
 git pull
-git tag v0.3.4
-git push origin v0.3.4
+git tag v0.3.7
+git push origin v0.3.7
 ```
 
-3. Wait for `Build Windows Release`. It runs `pnpm build:win:ci` and uploads:
+3. Wait for `Build Windows Release`. It runs `pnpm build:win:ci` and uploads a published release:
 
-- `dist/Aetherion.Launcher.Setup.0.3.4.exe`
-- `dist/Aetherion.Launcher.Setup.0.3.4.exe.blockmap`
+- `dist/latest.yml` (required; installed clients read this)
+- `dist/Aetherion.Launcher.Setup.0.3.7.exe` (one-time installer)
+- `dist/Aetherion.Launcher.Setup.0.3.7.exe.blockmap`
 
-4. Confirm:
+4. Confirm the release is not a draft and that `latest.yml` is attached:
 
 ```txt
-https://github.com/robb-devo/launcheraetherion/releases/download/v0.3.4/Aetherion.Launcher.Setup.0.3.4.exe
+https://github.com/robb-devo/launcheraetherion/releases/latest/download/latest.yml
 ```
 
-Do not republish the modpack `v0.4` jars. Modpack files still download from `washryan/launcheraetherion`.
+Anyone already on 0.3.7 or newer receives the next version in the app. The setup executable is only the first install.
+
+Do not republish the old Forge modpack. The client pack is the Fabric manifest shipped in the app.
 
 ### Publish from a Windows machine
 

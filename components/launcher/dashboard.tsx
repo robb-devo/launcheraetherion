@@ -3,30 +3,43 @@
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Cog, Globe, LogIn, Play, Youtube } from "lucide-react"
+import { Cog, Globe, LogIn, Play, Server } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import {
-  MOCK_ACCOUNTS,
-  DEFAULT_SETTINGS,
-  MOCK_MANIFEST,
-  MOCK_MOJANG_STATUS,
-  MOCK_SERVER_STATUS,
-} from "@/lib/launcher/mock-data"
-import { simulateLaunch } from "@/lib/launcher/launch-simulator"
+import { DEFAULT_SETTINGS, CLIENT_PACK, PACK_LABEL } from "@/lib/launcher/mock-data"
+import { DISCORD_URL, WEBSITE_URL } from "@/lib/launcher/social"
 import type { Account, LauncherSettings, LaunchProgress } from "@/lib/launcher/types"
 import { publicAssetPath } from "@/lib/public-path"
 import { LAUNCHER_VERSION } from "@/lib/launcher/version"
 import { AetherionMark } from "./aetherion-mark"
 import { LaunchProgressOverlay } from "./launch-progress"
+import type { LauncherUpdateState } from "@/types/aetherion"
+
+type RealmStatus = {
+  state: "online" | "offline" | "unknown"
+  players: { current: number; max: number } | null
+  ping: number | null
+}
+
+const UNKNOWN_REALM: RealmStatus = {
+  state: "unknown",
+  players: null,
+  ping: null,
+}
 
 export function Dashboard() {
   const router = useRouter()
-  const [activeAccount, setActiveAccount] = useState<Account | null>(MOCK_ACCOUNTS[0])
+  const [activeAccount, setActiveAccount] = useState<Account | null>(null)
   const [settings, setSettings] = useState<LauncherSettings>(DEFAULT_SETTINGS)
   const [progress, setProgress] = useState<LaunchProgress | null>(null)
+  const [realm, setRealm] = useState<RealmStatus>(UNKNOWN_REALM)
   const abortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    if (!window.aetherion?.launch) return
+    return window.aetherion.launch.onProgress((next) => setProgress(next))
+  }, [])
 
   useEffect(() => {
     if (!window.aetherion?.accounts) return
@@ -44,7 +57,7 @@ export function Dashboard() {
         }
       })
       .catch((err) => console.warn("[aetherion] failed to load account", err))
-  }, [])
+  }, [router])
 
   useEffect(() => {
     if (!window.aetherion?.settings) return
@@ -55,45 +68,51 @@ export function Dashboard() {
       .catch((err) => console.warn("[aetherion] failed to load settings", err))
   }, [])
 
-  // Fase 5 (Electron): esse handler chama window.aetherion.launch({ ... })
-  // e escuta os mesmos eventos `LaunchProgress`. Aqui usamos o simulador
-  // que percorre TODAS as fases reais do pipeline.
+  useEffect(() => {
+    if (!window.aetherion?.status) return
+    window.aetherion.status
+      .realm()
+      .then((status) =>
+        setRealm({
+          state: status.state,
+          players: status.players,
+          ping: status.ping,
+        }),
+      )
+      .catch(() => setRealm(UNKNOWN_REALM))
+  }, [])
+
   async function handleLaunch() {
     const controller = new AbortController()
     if (!activeAccount) {
       router.push("/login")
       return
     }
+    if (!window.aetherion?.launch) {
+      setProgress({
+        phase: "error",
+        message: "Desktop launcher required",
+        error: "Play installs the pack and starts Minecraft from the desktop launcher.",
+      })
+      return
+    }
     abortRef.current = controller
-    setProgress({ phase: "fetching-manifest", message: "Starting..." })
+    setProgress({ phase: "fetching-manifest", message: "Fetching the pack..." })
 
     try {
-      if (window.aetherion?.launch) {
-        const unsubscribe = window.aetherion.launch.onProgress((p) => setProgress(p))
-        try {
-          await window.aetherion.launch.start({
-            accountId: activeAccount.id,
-            instanceId: MOCK_MANIFEST.instanceId ?? "aetherion-main",
-            fullscreen: settings.minecraft.fullscreen,
-            width: settings.minecraft.resolution.width,
-            height: settings.minecraft.resolution.height,
-            autoConnectServer: settings.minecraft.autoConnectServer,
-            detachProcess: settings.minecraft.detachProcess,
-            closeOnLaunch: settings.minecraft.closeOnLaunch,
-          })
-        } finally {
-          unsubscribe()
-        }
-        setTimeout(() => {
-          setProgress((current) => (current?.phase === "running" ? null : current))
-        }, 1200)
-        return
-      }
-
-      await simulateLaunch({
-        signal: controller.signal,
-        onProgress: (p) => setProgress(p),
+      await window.aetherion.launch.start({
+        accountId: activeAccount.id,
+        instanceId: CLIENT_PACK.id,
+        fullscreen: settings.minecraft.fullscreen,
+        width: settings.minecraft.resolution.width,
+        height: settings.minecraft.resolution.height,
+        autoConnectServer: settings.minecraft.autoConnectServer,
+        detachProcess: settings.minecraft.detachProcess,
+        closeOnLaunch: settings.minecraft.closeOnLaunch,
       })
+      setTimeout(() => {
+        setProgress((current) => (current?.phase === "running" ? null : current))
+      }, 1400)
     } catch (err) {
       if (controller.signal.aborted) {
         setProgress(null)
@@ -160,48 +179,70 @@ export function Dashboard() {
               AETHERION
             </p>
             <p className="mt-3 text-sm text-foreground/70">
-              {MOCK_MANIFEST.minecraft} · Forge {MOCK_MANIFEST.forge.version}
+              {PACK_LABEL}
             </p>
           </div>
         </div>
+
+        <UpdateNotice />
 
         <footer className="px-6 pb-6">
           <div className="aetherion-dock grid grid-cols-12 items-center gap-5 rounded-2xl px-5 py-4">
             <div className="col-span-5 flex items-center gap-6">
               <StatusBlock
                 label="Players"
-                value={`${MOCK_SERVER_STATUS.players.current} / ${MOCK_SERVER_STATUS.players.max}`}
-                dotClass="bg-primary text-primary"
+                value={
+                  realm.players ? `${realm.players.current} / ${realm.players.max}` : "—"
+                }
+                dotClass={
+                  realm.state === "online"
+                    ? "bg-primary text-primary"
+                    : realm.state === "offline"
+                      ? "bg-destructive text-destructive"
+                      : "bg-muted-foreground text-muted-foreground"
+                }
               />
               <span className="hidden h-8 w-px bg-white/10 sm:block" aria-hidden />
               <StatusBlock
-                label="Mojang"
-                value={MOCK_MOJANG_STATUS.auth === "green" ? "Online" : "Unstable"}
+                label="AETHERION"
+                value={
+                  realm.state === "online"
+                    ? "Online"
+                    : realm.state === "offline"
+                      ? "Offline"
+                      : "Unknown"
+                }
                 dotClass={
-                  MOCK_MOJANG_STATUS.auth === "green"
+                  realm.state === "online"
                     ? "bg-primary text-primary"
-                    : "bg-destructive text-destructive"
+                    : realm.state === "offline"
+                      ? "bg-destructive text-destructive"
+                      : "bg-muted-foreground text-muted-foreground"
                 }
               />
               <span className="hidden h-8 w-px bg-white/10 sm:block" aria-hidden />
               <StatusBlock
                 label="Ping"
-                value={`${MOCK_SERVER_STATUS.ping ?? "--"} ms`}
+                value={realm.ping != null ? `${realm.ping} ms` : "—"}
                 dotClass="bg-magic text-magic"
               />
             </div>
 
             <div className="col-span-3 flex items-center justify-center gap-2">
+              <Link
+                href="/sandbox"
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/4 px-3 text-[11px] uppercase tracking-[0.16em] text-muted-foreground transition hover:border-primary/40 hover:text-primary"
+              >
+                <Server className="size-3.5" />
+                Server
+              </Link>
               <IconLink href="/settings/account" label="Settings">
                 <Cog className="size-4" />
               </IconLink>
-              <IconLink href="#" label="Site">
+              <IconLink href={WEBSITE_URL} label="Site">
                 <Globe className="size-4" />
               </IconLink>
-              <IconLink href="#" label="YouTube">
-                <Youtube className="size-4" />
-              </IconLink>
-              <IconLink href="#" label="Discord">
+              <IconLink href={DISCORD_URL} label="Discord">
                 <DiscordMark />
               </IconLink>
             </div>
@@ -210,10 +251,10 @@ export function Dashboard() {
               <div className="text-right">
                 <p className="aetherion-kicker">Instance</p>
                 <p className="mt-1 text-sm font-medium text-foreground">
-                  {MOCK_MANIFEST.name}
+                  {CLIENT_PACK.name}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {MOCK_MANIFEST.minecraft} · v{MOCK_MANIFEST.version}
+                  {PACK_LABEL}
                 </p>
               </div>
 
@@ -248,6 +289,38 @@ export function Dashboard() {
   )
 }
 
+function UpdateNotice() {
+  const [update, setUpdate] = useState<LauncherUpdateState | null>(null)
+
+  useEffect(() => {
+    const updater = window.aetherion?.updater
+    if (!updater) return
+    updater.get().then(setUpdate).catch(() => undefined)
+    return updater.onState(setUpdate)
+  }, [])
+
+  if (!update || (update.status !== "downloading" && update.status !== "ready")) return null
+
+  return (
+    <div className="mx-6 mb-3 flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-background/75 px-4 py-2 backdrop-blur-md">
+      <p className="text-sm text-foreground">{update.message}</p>
+      {update.status === "ready" ? (
+        <Button
+          size="sm"
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
+          onClick={() => {
+            window.aetherion?.updater.install().catch((err) => {
+              console.warn("[aetherion] failed to install update", err)
+            })
+          }}
+        >
+          Restart
+        </Button>
+      ) : null}
+    </div>
+  )
+}
+
 function StatusBlock({
   label,
   value,
@@ -277,12 +350,31 @@ function IconLink({
   label: string
   children: React.ReactNode
 }) {
+  const className =
+    "inline-flex size-9 items-center justify-center rounded-lg border border-white/10 bg-white/4 text-muted-foreground transition duration-200 hover:-translate-y-px hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+  if (href.startsWith("http")) {
+    return (
+      <button
+        type="button"
+        aria-label={label}
+        className={className}
+        onClick={() => {
+          const open = window.aetherion?.shell?.openExternal
+          if (open) {
+            open(href).catch((err) => {
+              console.warn("[aetherion] failed to open link", err)
+            })
+            return
+          }
+          window.open(href, "_blank", "noopener,noreferrer")
+        }}
+      >
+        {children}
+      </button>
+    )
+  }
   return (
-    <Link
-      href={href}
-      aria-label={label}
-      className="inline-flex size-9 items-center justify-center rounded-lg border border-white/10 bg-white/4 text-muted-foreground transition duration-200 hover:-translate-y-px hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-    >
+    <Link href={href} aria-label={label} className={className}>
       {children}
     </Link>
   )

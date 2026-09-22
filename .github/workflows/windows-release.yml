@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag, exemplo: v0.3.4. Precisa ser igual a package.json version."
+        description: "Release tag, exemplo: v0.3.7. Precisa ser igual a package.json version."
         required: true
-        default: "v0.3.4"
+        default: "v0.3.7"
 
 permissions:
   contents: write
@@ -40,12 +40,19 @@ jobs:
       - name: Build Windows installer
         run: pnpm build:win:ci
 
+      - name: Require in-app update metadata
+        shell: pwsh
+        run: |
+          if (-not (Test-Path dist/latest.yml)) { throw "dist/latest.yml is missing. Installed clients cannot see this release." }
+          if (-not (Test-Path dist/*.exe.blockmap)) { throw "The installer blockmap is missing." }
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: Aetherion Launcher ${{ env.RELEASE_TAG }}
           files: |
+            dist/latest.yml
             dist/Aetherion.Launcher.Setup.*.exe
             dist/Aetherion.Launcher.Setup.*.exe.blockmap
           fail_on_unmatched_files: true

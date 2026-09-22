@@ -89,20 +89,22 @@ export function computeUpdatePlan(input: ComputePlanInput): UpdatePlan {
   const actions: UpdateAction[] = []
 
   // ---- 1) Forge ---------------------------------------------------------
-  const needsForgeInstall =
-    local.installedForgeSha?.toLowerCase() !== manifest.forge.sha256.toLowerCase()
+  const forge = manifest.forge
+  const needsForgeInstall = Boolean(
+    forge?.sha256 && local.installedForgeSha?.toLowerCase() !== forge.sha256.toLowerCase(),
+  )
 
-  if (needsForgeInstall) {
-    const forgePath = `forge/forge-${manifest.forge.version}-installer.jar`
-    if (installedHashes[forgePath] === manifest.forge.sha256.toLowerCase()) {
+  if (forge?.sha256 && needsForgeInstall) {
+    const forgePath = `forge/forge-${forge.version}-installer.jar`
+    if (installedHashes[forgePath] === forge.sha256.toLowerCase()) {
       actions.push({ kind: "skip", path: forgePath, reason: "hash-match" })
     } else {
       actions.push({
         kind: "download",
         path: forgePath,
-        url: manifest.forge.url,
-        sha256: manifest.forge.sha256,
-        size: manifest.forge.size ?? 0,
+        url: forge.url,
+        sha256: forge.sha256,
+        size: forge.size ?? 0,
         category: "forge",
       })
     }

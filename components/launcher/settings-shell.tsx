@@ -2,13 +2,14 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ArrowLeft, Box, Cog, Coffee, Home, User } from "lucide-react"
+import { ArrowLeft, Box, Cog, Coffee, Home, Server, User } from "lucide-react"
 import type React from "react"
 import { cn } from "@/lib/utils"
 import { LAUNCHER_VERSION } from "@/lib/launcher/version"
 import { AetherionMark } from "./aetherion-mark"
 
 const NAV = [
+  { href: "/sandbox", label: "Your server", icon: Server },
   { href: "/settings/account", label: "Account", icon: User },
   { href: "/settings/minecraft", label: "Minecraft", icon: Home },
   { href: "/settings/mods", label: "Mods", icon: Box },

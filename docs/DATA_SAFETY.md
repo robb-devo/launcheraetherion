@@ -7,7 +7,8 @@ Compared with `main` (`0.3.0`), these storage decisions are the same functions a
 | What | Where it lives | Code |
 | --- | --- | --- |
 | App name (Windows userData folder) | `%APPDATA%\Aetherion Launcher` | `app.setName("Aetherion Launcher")` in `electron/main.cjs` |
-| Accounts and sessions | `%APPDATA%\Aetherion Launcher\accounts.json` | `accountsPath()` → `userData/accounts.json` |
+| Accounts (no tokens) | `%APPDATA%\Aetherion Launcher\accounts.json` | `accountsPath()` → `userData/accounts.json` |
+| Microsoft refresh token | `%APPDATA%\Aetherion Launcher\account-secrets.json` | OS encryption via `safeStorage` when the platform provides it |
 | Launcher settings, including Java | `%APPDATA%\Aetherion Launcher\launcher-settings.json` | `settingsPath()` → `userData/launcher-settings.json` |
 | Java executable, min RAM, max RAM, JVM args | fields `java.executablePath`, `java.minRamMb`, `java.maxRamMb`, `java.jvmArgs` inside `launcher-settings.json` | unchanged settings schema |
 | Minecraft instance, mods, saves, configs | `%APPDATA%\Aetherion Launcher\instances\<instanceId>` | `instancePath()` → `userData/instances/<sanitized id>` |

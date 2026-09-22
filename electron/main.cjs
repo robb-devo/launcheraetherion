@@ -1,4 +1,16 @@
 const { app, BrowserWindow, dialog, ipcMain, protocol, shell } = require("electron")
+const controlApi = require("./lib/control.cjs")
+const microsoftAuth = require("./lib/microsoft.cjs")
+const { probeRealm } = require("./lib/realm-status.cjs")
+const { startAppUpdater } = require("./lib/app-updater.cjs")
+const {
+  normalizePackManifest,
+  fabricProfileId,
+  packServer,
+  assertClientPack,
+} = require("./lib/pack-manifest.cjs")
+const { clientJarArtifact } = require("./lib/client-jar.cjs")
+const { assertSandboxJoin } = require("./lib/production-guard.cjs")
 const { spawn } = require("node:child_process")
 const crypto = require("node:crypto")
 const fsSync = require("node:fs")
@@ -15,35 +27,21 @@ const LAUNCHER_VERSION = require("../package.json").version
 const MOJANG_VERSION_MANIFEST =
   "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 const MINECRAFT_RESOURCES_BASE = "https://resources.download.minecraft.net"
-const DEFAULT_REMOTE_MANIFEST_URL =
-  "https://raw.githubusercontent.com/washryan/launcheraetherion/main/public/manifest.json"
-const MINECRAFT_START_GRACE_MS = 45000
 const APP_PROTOCOL = "aetherion"
-const LAUNCH_TARGET = {
-  minecraft: "1.19.2",
-  forge: "43.5.0",
-}
-const FORGE_INSTALLER_FILENAME = `forge-${LAUNCH_TARGET.minecraft}-${LAUNCH_TARGET.forge}-installer.jar`
 const DEFAULT_MANIFEST = {
-  version: "0.4-dev",
-  minecraft: LAUNCH_TARGET.minecraft,
-  name: "Aetherion Main",
-  instanceId: "aetherion-main",
-  publishedAt: "2026-04-19T00:00:00.000Z",
-  requiredLauncherVersion: "0.2.0",
-  forge: {
-    version: LAUNCH_TARGET.forge,
-    url: `https://maven.minecraftforge.net/net/minecraftforge/forge/${LAUNCH_TARGET.minecraft}-${LAUNCH_TARGET.forge}/${FORGE_INSTALLER_FILENAME}`,
-    sha256: "4869e60456321e99eb5120ae39171c382c27a05858cdfd4b90ff123e3750e681",
-    size: 7180192,
-    installedProfile: `${LAUNCH_TARGET.minecraft}-forge-${LAUNCH_TARGET.forge}`,
-  },
+  version: "1.2.3",
+  minecraft: "1.21.1",
+  name: "AETHERION",
+  instanceId: "aetherion-client",
+  loader: { type: "fabric", version: "0.19.5" },
+  server: { name: "AETHERION", address: "play.donnernet.de", port: 25565 },
+  java: { recommendedMajor: 21, minMajor: 21 },
   files: [],
-  java: { recommendedMajor: 17, minMajor: 17 },
-  protectedPatterns: ["mods/*-SERVER.jar", "config/custom-*.toml"],
+  shaderpacks: [],
 }
-const AETHERION_SERVER_HOST = "left-fcc.gl.joinmc.link"
-const AETHERION_SERVER_NAME = "Aetherion"
+const AETHERION_SERVER_HOST = "play.donnernet.de"
+const AETHERION_SERVER_PORT = 25565
+const AETHERION_SERVER_NAME = "AETHERION"
 const DEFAULT_SETTINGS = {
   minecraft: {
     resolution: { width: 1280, height: 720 },
@@ -73,6 +71,14 @@ let activeMinecraftProcess = null
 let activeMinecraftDetached = true
 
 app.setName("Aetherion Launcher")
+if (process.platform === "win32") {
+  app.setAppUserModelId("gg.aetherion.launcher")
+}
+microsoftAuth.configure({
+  getMainWindow: () => mainWindow,
+  userDataPath: () => app.getPath("userData"),
+  iconPath: () => appIconPath(),
+})
 protocol.registerSchemesAsPrivileged([
   {
     scheme: APP_PROTOCOL,
@@ -117,10 +123,28 @@ function createWindow() {
   }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    const target = externalHttpsUrl(url)
+    if (target) shell.openExternal(target)
     return { action: "deny" }
   })
 }
+
+function externalHttpsUrl(value) {
+  try {
+    const url = new URL(String(value || ""))
+    if (url.protocol !== "https:") return null
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+ipcMain.handle("shell:openExternal", async (_event, value) => {
+  const target = externalHttpsUrl(value)
+  if (!target) throw new Error("That link cannot be opened.")
+  await shell.openExternal(target)
+  return { ok: true }
+})
 
 function registerStaticAppProtocol() {
   protocol.handle(APP_PROTOCOL, async (request) => {
@@ -207,6 +231,7 @@ function appIconPath() {
 app.whenReady().then(async () => {
   if (!isDev) registerStaticAppProtocol()
   createWindow()
+  startAppUpdater()
 })
 
 app.on("window-all-closed", () => {
@@ -230,7 +255,7 @@ ipcMain.on("window:maximize", () => {
 })
 ipcMain.on("window:close", () => mainWindow?.close())
 
-ipcMain.handle("accounts:list", () => readAccountsState())
+ipcMain.handle("accounts:list", async () => visibleAccountsState(await readAccountsState()))
 ipcMain.handle("accounts:addOffline", async (_event, username) => {
   const state = await readAccountsState()
   const account = createOfflineAccount(username)
@@ -247,7 +272,7 @@ ipcMain.handle("accounts:addOffline", async (_event, username) => {
     accounts: [...state.accounts, account],
   }
   await writeAccountsState(next)
-  return next
+  return visibleAccountsState(next)
 })
 ipcMain.handle("accounts:remove", async (_event, id) => {
   const state = await readAccountsState()
@@ -255,7 +280,8 @@ ipcMain.handle("accounts:remove", async (_event, id) => {
   const activeId = state.activeId === id ? accounts[0]?.id ?? null : state.activeId
   const next = { activeId, accounts }
   await writeAccountsState(next)
-  return next
+  await microsoftAuth.deleteSecret(id)
+  return visibleAccountsState(next)
 })
 ipcMain.handle("accounts:setActive", async (_event, id) => {
   const state = await readAccountsState()
@@ -265,13 +291,46 @@ ipcMain.handle("accounts:setActive", async (_event, id) => {
 
   const next = { ...state, activeId: id }
   await writeAccountsState(next)
-  return next
+  return visibleAccountsState(next)
 })
 ipcMain.handle("accounts:getDataPath", () => accountsPath())
 
-ipcMain.handle("accounts:addMicrosoft", () => {
-  throw new Error("Microsoft sign-in is not available in this build yet.")
+ipcMain.handle("accounts:addMicrosoft", async () => {
+  const account = await microsoftAuth.loginMicrosoft()
+  const state = await readAccountsState()
+  const accounts = state.accounts.filter((candidate) => candidate.id !== account.id)
+  const next = { activeId: account.id, accounts: [...accounts, account] }
+  await writeAccountsState(next)
+  return visibleAccountsState(next)
 })
+
+ipcMain.handle("status:realm", async () => {
+  return probeRealm(AETHERION_SERVER_HOST, AETHERION_SERVER_PORT)
+})
+
+async function microsoftPlayerId() {
+  const state = await readAccountsState()
+  const account =
+    state.accounts.find((candidate) => candidate.id === state.activeId && candidate.type === "microsoft") ||
+    state.accounts.find((candidate) => candidate.type === "microsoft")
+  if (!account) throw new Error("Sign in with Microsoft before using sandboxes.")
+  return account.uuid
+}
+
+ipcMain.handle("sandbox:options", async () => controlApi.sandboxOptions(await microsoftPlayerId()))
+ipcMain.handle("sandbox:list", async () => controlApi.sandboxList(await microsoftPlayerId()))
+ipcMain.handle("sandbox:create", async (_event, input) =>
+  controlApi.sandboxCreate(await microsoftPlayerId(), input),
+)
+ipcMain.handle("sandbox:start", async (_event, id) =>
+  controlApi.sandboxStart(await microsoftPlayerId(), id),
+)
+ipcMain.handle("sandbox:stop", async (_event, id) =>
+  controlApi.sandboxStop(await microsoftPlayerId(), id),
+)
+ipcMain.handle("sandbox:remove", async (_event, id) =>
+  controlApi.sandboxDelete(await microsoftPlayerId(), id),
+)
 
 ipcMain.handle("settings:get", () => readLauncherSettings())
 ipcMain.handle("settings:update", async (_event, patch) => {
@@ -296,7 +355,7 @@ ipcMain.handle("settings:openInstanceFolder", async () => {
 })
 ipcMain.handle("java:detect", async () => {
   const settings = await readLauncherSettings()
-  const java = await resolveJavaForSettings(settings.java, 17, 17)
+  const java = await resolveJavaForSettings(settings.java, 21, 21)
   return {
     totalRamMb: systemRamMb(),
     java,
@@ -314,8 +373,8 @@ ipcMain.handle("java:chooseExecutable", async () => {
   if (result.canceled || !result.filePaths[0]) return null
 
   const java = await inspectJava(result.filePaths[0])
-  if (!java || java.major < 17) {
-    throw new Error("Choose Java 17 or newer.")
+  if (!java || java.major < 21) {
+    throw new Error("Choose Java 21 or newer.")
   }
 
   const settings = await readLauncherSettings()
@@ -566,6 +625,14 @@ async function writeAccountsState(state) {
   await fs.writeFile(filePath, `${JSON.stringify(sanitizeAccountsState(state), null, 2)}\n`, "utf8")
 }
 
+function visibleAccountsState(state) {
+  const accounts = (state?.accounts || []).filter((account) => account.type === "microsoft")
+  const activeId = accounts.some((account) => account.id === state.activeId)
+    ? state.activeId
+    : accounts[0]?.id || null
+  return { activeId, accounts }
+}
+
 function sanitizeAccountsState(value) {
   const accounts = Array.isArray(value?.accounts)
     ? value.accounts
@@ -579,11 +646,16 @@ function sanitizeAccountsState(value) {
           )
         })
         .map((account) => ({
-          ...account,
+          id: account.id,
+          type: account.type,
+          username: account.username,
+          uuid: account.uuid,
           avatarUrl:
             account.type === "offline" && isGeneratedAvatarUrl(account.avatarUrl)
               ? minecraftHeadUrl(account.username)
               : account.avatarUrl || minecraftHeadUrl(account.username),
+          addedAt: account.addedAt,
+          lastUsedAt: account.lastUsedAt,
         }))
     : []
 
@@ -719,12 +791,23 @@ function clampNumber(value, min, max, fallback) {
 }
 
 async function runUpdater(args, signal) {
+  let request = args || {}
+  if (request.isolated || request.serverHost) {
+    const sandboxJoin = assertSandboxJoin(request.serverHost, request.serverPort)
+    request = {
+      ...request,
+      isolated: true,
+      serverHost: sandboxJoin.host,
+      serverPort: sandboxJoin.port,
+      autoConnectServer: false,
+    }
+  }
   const settings = await readLauncherSettings()
-  const launchArgs = normalizeLaunchArgs(args, settings)
+  const launchArgs = normalizeLaunchArgs(request, settings)
 
   emitLaunchProgress({
     phase: "fetching-manifest",
-    message: `Fetching manifest (${LAUNCH_TARGET.minecraft} + Forge ${LAUNCH_TARGET.forge})...`,
+    message: "Fetching the Aetherion pack...",
   })
 
   const manifest = await loadManifest(settings, signal)
@@ -754,7 +837,7 @@ async function runUpdater(args, signal) {
   if (plan.downloadCount === 0 && plan.removeCount === 0) {
     emitLaunchProgress({
       phase: "verifying",
-      message: `Up to date: ${manifest.minecraft} + Forge ${manifest.forge.version}`,
+      message: `Up to date: Minecraft ${manifest.minecraft} + Fabric ${manifest.loader.version}`,
       totalBytes: 0,
       loadedBytes: 0,
       filesDone: 0,
@@ -764,13 +847,9 @@ async function runUpdater(args, signal) {
     await executeUpdatePlan(root, plan, signal)
   }
 
-  const installedForgeSha = await installForgeIfNeeded(
-    root,
-    manifest,
-    localState,
-    settings.java,
-    signal,
-  )
+  await ensureFabricProfile(root, manifest, signal)
+  await applyIrisDefaults(root, manifest)
+  const installedForgeSha = localState.installedForgeSha || null
 
   const nextState = {
     instanceId,
@@ -809,7 +888,7 @@ async function runUpdater(args, signal) {
 
   return {
     minecraft: manifest.minecraft,
-    forge: manifest.forge.version,
+    loader: manifest.loader.version,
     launchPlan: summarizeLaunchPlan(finalLaunchPlan),
     process: processInfo,
   }
@@ -817,12 +896,13 @@ async function runUpdater(args, signal) {
 
 function normalizeLaunchArgs(args, settings) {
   const minecraft = settings.minecraft
+  const directServer = Boolean(String(args?.serverHost || "").trim()) || Boolean(args?.isolated)
   return {
     ...args,
     fullscreen: Boolean(minecraft.fullscreen),
     width: minecraft.resolution.width,
     height: minecraft.resolution.height,
-    autoConnectServer: Boolean(minecraft.autoConnectServer),
+    autoConnectServer: directServer ? false : Boolean(minecraft.autoConnectServer),
     detachProcess: Boolean(minecraft.detachProcess),
     closeOnLaunch: Boolean(minecraft.closeOnLaunch),
     java: settings.java,
@@ -832,11 +912,11 @@ function normalizeLaunchArgs(args, settings) {
 async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
   emitLaunchProgress({
     phase: "launching",
-    message: "Building the Minecraft/Forge launch plan...",
+    message: "Building the Minecraft launch plan...",
   })
 
-  const profileId =
-    manifest.forge.installedProfile || `${manifest.minecraft}-forge-${manifest.forge.version}`
+  const profileId = fabricProfileId(manifest)
+  const realm = packServer(manifest)
   const forgeProfilePath = path.join(root, "versions", profileId, `${profileId}.json`)
   const forgeProfile = await readJsonFile(forgeProfilePath)
   const parentId = forgeProfile.inheritsFrom || manifest.minecraft
@@ -846,41 +926,57 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
     throw new Error(`Profile ${profileId} does not include a mainClass, so Minecraft cannot start.`)
   }
   const account = await getLaunchAccount(args?.accountId)
+  const session = await microsoftAuth.sessionForAccount(account)
+  if (session.profile && session.profile.username !== account.username) {
+    const state = await readAccountsState()
+    const next = {
+      ...state,
+      accounts: state.accounts.map((candidate) =>
+        candidate.id === account.id
+          ? { ...candidate, username: session.profile.username, lastUsedAt: new Date().toISOString() }
+          : candidate,
+      ),
+    }
+    await writeAccountsState(next)
+  }
   const java = await resolveJavaForSettings(
     args?.java,
-    manifest.java?.minMajor || 17,
-    manifest.java?.recommendedMajor || manifest.java?.minMajor || 17,
+    manifest.java?.minMajor || 21,
+    manifest.java?.recommendedMajor || manifest.java?.minMajor || 21,
+    true,
   )
 
   if (!java) {
-    throw new Error(
-      "Java 17 was not found. Install Eclipse Temurin/OpenJDK 17 or set JAVA_HOME.",
-    )
+    throw new Error("Java 21 was not found. Install Eclipse Temurin 21 or set JAVA_HOME.")
   }
 
   const libraryDirectory = path.join(root, "libraries")
   const assetsRoot = path.join(root, "assets")
   const nativesDirectory = path.join(root, "natives", profileId)
-  const clientJar = path.join(root, "versions", parentId, `${parentId}.jar`)
+  const clientArtifact = clientJarArtifact(root, parentId, parentProfile)
+  const clientJar = clientArtifact.path
   const libraryPlan = collectLibraries(root, merged.libraries)
   const includeVanillaClientJar = !isForgeProfile(forgeProfile)
+  const clientReady = includeVanillaClientJar
+    ? await fileMatchesHash(clientJar, clientArtifact.sha1, "sha1")
+    : true
   const classpathEntries = includeVanillaClientJar
     ? [...libraryPlan.classpath, clientJar]
     : libraryPlan.classpath
   const assetPlan = await collectAssetPlan(root, parentProfile.assetIndex)
   const variables = {
-    auth_player_name: account.username,
+    auth_player_name: session.name,
     version_name: profileId,
     game_directory: root,
     assets_root: assetsRoot,
     assets_index_name: parentProfile.assetIndex?.id || parentId,
     resolution_width: args?.width || 1280,
     resolution_height: args?.height || 720,
-    auth_uuid: account.uuid.replace(/-/g, ""),
-    auth_access_token: "0",
+    auth_uuid: session.uuid,
+    auth_access_token: session.accessToken,
     clientid: "",
-    auth_xuid: "",
-    user_type: account.type === "microsoft" ? "msa" : "legacy",
+    auth_xuid: session.xuid || "",
+    user_type: session.userType,
     version_type: forgeProfile.type || parentProfile.type || "release",
     natives_directory: nativesDirectory,
     launcher_name: LAUNCHER_NAME,
@@ -904,17 +1000,34 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
   const gameArgs = resolveArguments(merged.arguments.game, variables, {
     has_custom_resolution: true,
   })
+  const directHost = String(args?.serverHost || "").trim()
+  const directPort = Number(args?.serverPort)
   if (args?.fullscreen) gameArgs.push("--fullscreen")
-  if (args?.autoConnectServer) gameArgs.push("--server", AETHERION_SERVER_HOST)
-  await ensureMinecraftServerList(root)
+  let sandboxTarget = null
+  if (args?.isolated || directHost) {
+    sandboxTarget = assertSandboxJoin(directHost, directPort)
+    gameArgs.push("--server", sandboxTarget.host)
+    gameArgs.push("--port", String(sandboxTarget.port))
+  } else if (args?.autoConnectServer) {
+    gameArgs.push("--server", realm.host)
+    gameArgs.push("--port", String(realm.port || AETHERION_SERVER_PORT))
+  }
+  await ensureMinecraftServerList(
+    root,
+    sandboxTarget
+      ? {
+          host: sandboxTarget.host,
+          port: sandboxTarget.port,
+          name: String(args?.serverName || "Sandbox"),
+        }
+      : null,
+  )
   const commandArgs = [...jvmArgs, merged.mainClass, ...gameArgs]
   const assetIndexPath = path.join(assetsRoot, "indexes", `${variables.assets_index_name}.json`)
   const missing = [
     ...libraryPlan.missing,
     ...libraryPlan.missingNatives,
-    ...(includeVanillaClientJar && !fsSync.existsSync(clientJar)
-      ? [toPosix(path.relative(root, clientJar))]
-      : []),
+    ...(includeVanillaClientJar && !clientReady ? [clientArtifact.relativePath] : []),
     ...assetPlan.missing,
   ]
 
@@ -928,6 +1041,7 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
     mainClass: merged.mainClass,
     classpathEntries,
     includeVanillaClientJar,
+    clientJar: includeVanillaClientJar ? clientArtifact : null,
     libraryArtifacts: libraryPlan.artifacts,
     nativeArtifacts: libraryPlan.nativeArtifacts,
     nativesDirectory,
@@ -997,7 +1111,7 @@ async function startMinecraft(launchPlan, signal) {
 
   emitLaunchProgress({
     phase: "launching",
-    message: "Starting Minecraft...",
+    message: "Launching Minecraft...",
   })
 
   console.log("[aetherion] starting minecraft", {
@@ -1031,14 +1145,20 @@ async function startMinecraft(launchPlan, signal) {
     if (lastLine) console.log("[minecraft]", lastLine)
   }
 
-  child.stdout.on("data", writeLog)
-  child.stderr.on("data", writeLog)
+  const runningMark = /Setting user:|LWJGL Version|OpenAL|Sound engine started|Backend library:/i
+  const watchLog = (chunk) => {
+    writeLog(chunk)
+    if (runningMark.test(chunk.toString())) markRunning()
+  }
+  child.stdout.on("data", watchLog)
+  child.stderr.on("data", watchLog)
 
   const abort = () => {
     if (!child.killed) child.kill()
   }
   signal?.addEventListener("abort", abort, { once: true })
 
+  let markRunning = () => {}
   const processInfo = await new Promise((resolve, reject) => {
     let settled = false
     const settle = (fn, value) => {
@@ -1048,10 +1168,16 @@ async function startMinecraft(launchPlan, signal) {
       signal?.removeEventListener("abort", abort)
       fn(value)
     }
-    const startedTimer = setTimeout(() => {
+    markRunning = () => {
+      if (settled || child.killed || child.exitCode != null) return
       if (launchPlan.detachProcess) child.unref()
+      emitLaunchProgress({
+        phase: "running",
+        message: `Minecraft is running (PID ${child.pid}).`,
+      })
       settle(resolve, { pid: child.pid, logPath })
-    }, MINECRAFT_START_GRACE_MS)
+    }
+    const startedTimer = setTimeout(markRunning, 8000)
 
     child.on("error", (error) => {
       settle(reject, error)
@@ -1090,10 +1216,8 @@ async function minecraftExitDiagnostics(root, logPath, code) {
   const crashTail = crashReport ? await readTail(crashReport, 60) : ""
   const hints = []
 
-  if (/java version 2[1-9]\./i.test(logTail)) {
-    hints.push(
-      "Java 21 detected. For Minecraft 1.19.2 with Forge, use Java 17 in Settings > Java.",
-    )
+  if (/java version "1[0-7]/.test(logTail) || /java version 1[0-7]\./i.test(logTail)) {
+    hints.push("Minecraft 1.21.1 needs Java 21.")
   }
   if (/OptiFineTransformationService|OptiFineTransformer/i.test(logTail)) {
     hints.push("OptiFine was enabled. Turn OptiFine off under optional mods to test stability.")
@@ -1142,7 +1266,7 @@ async function readTail(filePath, maxLines) {
     .join("\n")
 }
 
-async function ensureMinecraftServerList(root) {
+async function ensureMinecraftServerList(root, extra) {
   const serversPath = path.join(root, "servers.dat")
   let rootTag = null
   let compressed = true
@@ -1179,18 +1303,43 @@ async function ensureMinecraftServerList(root) {
   }
 
   const list = rootTag.value.servers.value.value
-  const hasAetherion = list.some((server) => {
-    const ip = String(server?.ip?.value || "").toLowerCase()
-    return ip === AETHERION_SERVER_HOST.toLowerCase()
-  })
-  if (hasAetherion) return
+  const wanted = [{ name: AETHERION_SERVER_NAME, ip: AETHERION_SERVER_HOST }]
+  if (extra?.host) {
+    const port = Number(extra.port)
+    if (!Number.isInteger(port) || port === AETHERION_SERVER_PORT) {
+      throw new Error("Sandboxes stay off the live Aetherion realm.")
+    }
+    const host = String(extra.host || "").trim().toLowerCase().replace(/\.$/, "")
+    if (host === AETHERION_SERVER_HOST || host.endsWith(`.${AETHERION_SERVER_HOST}`)) {
+      throw new Error("Sandboxes stay off the live Aetherion realm.")
+    }
+    wanted.push({
+      name: extra.name || "Sandbox",
+      ip: `${String(extra.host).trim()}:${port}`,
+    })
+  }
 
-  list.unshift({
-    name: { type: 8, value: AETHERION_SERVER_NAME },
-    ip: { type: 8, value: AETHERION_SERVER_HOST },
-    acceptTextures: { type: 1, value: 1 },
-  })
+  let changed = false
+  for (const entry of wanted) {
+    const key = entry.ip.toLowerCase()
+    const index = list.findIndex((server) => String(server?.ip?.value || "").toLowerCase() === key)
+    const tag = {
+      name: { type: 8, value: entry.name },
+      ip: { type: 8, value: entry.ip },
+      acceptTextures: { type: 1, value: 1 },
+    }
+    if (index >= 0) {
+      if (list[index]?.name?.value !== entry.name) {
+        list[index] = { ...list[index], ...tag }
+        changed = true
+      }
+    } else {
+      list.unshift(tag)
+      changed = true
+    }
+  }
 
+  if (!changed && fsSync.existsSync(serversPath)) return
   await fs.writeFile(serversPath, encodeMaybeCompressedNbt(rootTag, compressed))
 }
 
@@ -1418,6 +1567,14 @@ function writeUInt16(value) {
 }
 
 async function prepareMinecraftRuntime(root, launchPlan, signal) {
+  if (launchPlan.clientJar && !(await fileMatchesHash(launchPlan.clientJar.path, launchPlan.clientJar.sha1, "sha1"))) {
+    await downloadRuntimeArtifacts(
+      [launchPlan.clientJar],
+      signal,
+      `Downloading Minecraft ${launchPlan.parentId}`,
+    )
+  }
+
   const artifacts = uniqueArtifacts([
     ...launchPlan.libraryArtifacts,
     ...launchPlan.nativeArtifacts,
@@ -1425,7 +1582,7 @@ async function prepareMinecraftRuntime(root, launchPlan, signal) {
   const libraryDownloads = []
 
   for (const artifact of artifacts) {
-    if (!(await fileMatchesHash(artifact.path, artifact.sha1, "sha1"))) {
+    if (!(await cachedRuntimeFile(artifact))) {
       libraryDownloads.push(artifact)
     }
   }
@@ -1452,7 +1609,7 @@ async function prepareMinecraftRuntime(root, launchPlan, signal) {
   for (const [name, object] of Object.entries(assetIndex.objects || {})) {
     if (!object?.hash) continue
     const asset = assetObjectArtifact(root, name, object)
-    if (!(await fileMatchesHash(asset.path, asset.sha1, "sha1"))) {
+    if (!(await cachedRuntimeFile(asset))) {
       assetDownloads.push(asset)
     }
   }
@@ -1657,8 +1814,8 @@ async function getLaunchAccount(accountId) {
     state.accounts.find((candidate) => candidate.id === accountId) ||
     state.accounts.find((candidate) => candidate.id === state.activeId)
 
-  if (!account) {
-    throw new Error("No active local account was found, so Minecraft cannot start.")
+  if (!account || account.type !== "microsoft") {
+    throw new Error("Sign in with Microsoft before playing.")
   }
 
   return account
@@ -1932,80 +2089,53 @@ function mavenPathFromName(name) {
   return `${group.replace(/\./g, "/")}/${artifact}/${version}/${artifact}-${version}${classifier}.${extension}`
 }
 
-async function installForgeIfNeeded(root, manifest, localState, javaSettings, signal) {
-  const targetSha = manifest.forge.sha256
-  const installerPath = safeResolve(
-    root,
-    `forge/forge-${manifest.minecraft}-${manifest.forge.version}-installer.jar`,
-  )
-  const profileId =
-    manifest.forge.installedProfile || `${manifest.minecraft}-forge-${manifest.forge.version}`
-  const profileJson = path.join(root, "versions", profileId, `${profileId}.json`)
-
-  if (
-    localState.installedForgeSha?.toLowerCase() === targetSha.toLowerCase() &&
-    fsSync.existsSync(profileJson)
-  ) {
+async function ensureFabricProfile(root, manifest, signal) {
+  const profileId = fabricProfileId(manifest)
+  const jsonPath = path.join(root, "versions", profileId, `${profileId}.json`)
+  if (fsSync.existsSync(jsonPath)) {
     emitLaunchProgress({
       phase: "installing-forge",
-      message: `Forge ${manifest.forge.version} is already installed.`,
+      message: `Fabric ${manifest.loader.version} is already installed.`,
     })
-    return targetSha
-  }
-
-  if (!fsSync.existsSync(installerPath)) {
-    throw new Error(`Forge installer was not found: ${installerPath}`)
-  }
-
-  emitLaunchProgress({
-    phase: "checking-java",
-    message: "Looking for Java 17 on this PC...",
-  })
-  const java = await resolveJavaForSettings(
-    javaSettings,
-    manifest.java?.minMajor || 17,
-    manifest.java?.recommendedMajor || manifest.java?.minMajor || 17,
-  )
-  if (!java) {
-    throw new Error(
-      "Java 17 was not found. Install Eclipse Temurin/OpenJDK 17 or set JAVA_HOME.",
-    )
-  }
-
-  await ensureLauncherProfile(root)
-
-  emitLaunchProgress({
-    phase: "installing-forge",
-    message: `Installing Forge ${manifest.forge.version} with ${java.version}...`,
-  })
-
-  await runProcess(
-    java.path,
-    ["-jar", installerPath, "--installClient", root],
-    { cwd: root },
-    signal,
-    (line) => {
-      if (!line.trim()) return
-      emitLaunchProgress({
-        phase: "installing-forge",
-        message: line.trim().slice(0, 180),
-      })
-    },
-  )
-
-  if (!fsSync.existsSync(profileJson)) {
-    throw new Error(
-      `Forge finished, but the profile was not found in versions/${profileId}.`,
-    )
+    return profileId
   }
 
   emitLaunchProgress({
     phase: "installing-forge",
-    message: `Forge ${manifest.forge.version} installed.`,
+    message: `Fetching Fabric ${manifest.loader.version} for Minecraft ${manifest.minecraft}...`,
   })
-
-  return targetSha
+  const url = `https://meta.fabricmc.net/v2/versions/loader/${manifest.minecraft}/${manifest.loader.version}/profile/json`
+  const profile = await fetchJson(url, signal)
+  await fs.mkdir(path.dirname(jsonPath), { recursive: true })
+  await fs.writeFile(jsonPath, `${JSON.stringify(profile, null, 2)}\n`, "utf8")
+  emitLaunchProgress({
+    phase: "installing-forge",
+    message: `Fabric ${manifest.loader.version} is ready.`,
+  })
+  return profileId
 }
+
+async function applyIrisDefaults(root, manifest) {
+  const enabled = (manifest.shaderpacks || []).find((shader) => shader && shader.enable !== false)
+  if (!enabled?.filename) return
+  const configDir = path.join(root, "config")
+  await fs.mkdir(configDir, { recursive: true })
+  const irisPath = path.join(configDir, "iris.properties")
+  let iris = ""
+  try {
+    iris = await fs.readFile(irisPath, "utf8")
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error
+  }
+  const shaderLine = `shaderPack=${enabled.filename}`
+  if (/^shaderPack=.*/m.test(iris)) iris = iris.replace(/^shaderPack=.*/m, shaderLine)
+  else iris = `${iris.trim()}\n${shaderLine}\n`
+  if (/^enableShaders=.*/m.test(iris)) iris = iris.replace(/^enableShaders=.*/m, "enableShaders=true")
+  else iris += "enableShaders=true\n"
+  if (!iris.endsWith("\n")) iris += "\n"
+  await fs.writeFile(irisPath, iris, "utf8")
+}
+
 
 async function ensureLauncherProfile(root) {
   const profilePath = path.join(root, "launcher_profiles.json")
@@ -2026,52 +2156,41 @@ async function ensureLauncherProfile(root) {
   await fs.writeFile(profilePath, `${JSON.stringify(profile, null, 2)}\n`, "utf8")
 }
 
-async function loadManifest(settings, signal) {
-  const configuredUrl =
-    typeof settings?.launcher?.manifestUrl === "string" ? settings.launcher.manifestUrl.trim() : ""
-  const defaultUrl = process.env.AETHERION_MANIFEST_URL || (isDev ? "" : DEFAULT_REMOTE_MANIFEST_URL)
-  const url = configuredUrl || defaultUrl
-  if (!url) {
-    const localManifestPath = process.env.AETHERION_LOCAL_MANIFEST || path.resolve(process.cwd(), "manifest.json")
-    if (isDev && fsSync.existsSync(localManifestPath)) {
-      console.log("[aetherion] using local manifest", localManifestPath)
-      return readJsonFile(localManifestPath)
+async function loadManifest(_settings, signal) {
+  const url = String(process.env.AETHERION_MANIFEST_URL || "").trim()
+  if (url) {
+    const cacheBust = `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`
+    const response = await fetch(cacheBust, {
+      signal,
+      headers: { Accept: "application/json" },
+      redirect: "follow",
+    })
+    if (!response.ok) {
+      throw new Error(`Could not fetch the manifest (${response.status} ${response.statusText})`)
     }
-    const bundledManifestPath = path.join(app.getAppPath(), "out", "manifest.json")
-    if (!isDev && fsSync.existsSync(bundledManifestPath)) {
-      console.log("[aetherion] using bundled manifest", bundledManifestPath)
-      return readJsonFile(bundledManifestPath)
-    }
-    return DEFAULT_MANIFEST
+    const manifest = normalizePackManifest(await response.json())
+    assertClientPack(manifest)
+    return manifest
   }
 
-  const cacheBust = `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`
-  const response = await fetch(cacheBust, {
-    signal,
-    headers: { Accept: "application/json" },
-    redirect: "follow",
-  })
-  if (!response.ok) {
-    throw new Error(`Could not fetch the manifest (${response.status} ${response.statusText})`)
+  const candidates = [
+    path.join(app.getAppPath(), "out", "manifest.json"),
+    path.join(app.getAppPath(), "public", "manifest.json"),
+    path.resolve(process.cwd(), "public", "manifest.json"),
+  ]
+  for (const candidate of candidates) {
+    if (!fsSync.existsSync(candidate)) continue
+    console.log("[aetherion] using bundled pack", candidate)
+    const manifest = normalizePackManifest(await readJsonFile(candidate))
+    assertClientPack(manifest)
+    return manifest
   }
-  return response.json()
+
+  throw new Error("The Aetherion 1.21.1 Fabric pack is missing from this build.")
 }
 
 function validateManifest(manifest) {
-  if (!manifest || typeof manifest !== "object") throw new Error("Invalid manifest.")
-  if (!manifest.version) throw new Error("Invalid manifest: missing 'version'.")
-  if (!manifest.minecraft) throw new Error("Invalid manifest: missing 'minecraft'.")
-  if (!manifest.forge?.url || !manifest.forge?.sha256 || !manifest.forge?.version) {
-    throw new Error("Invalid manifest: incomplete 'forge' block.")
-  }
-  if (!Array.isArray(manifest.files)) {
-    throw new Error("Invalid manifest: 'files' must be an array.")
-  }
-  for (const file of manifest.files) {
-    if (!file.path || !file.url || !file.sha256 || typeof file.size !== "number") {
-      throw new Error(`Invalid manifest: file '${file.path || "(no path)"}' is incomplete.`)
-    }
-  }
+  assertClientPack(manifest)
 }
 
 async function readInstanceState(root, manifest, instanceId) {
@@ -2165,24 +2284,7 @@ async function scanDropinMods(root, knownMods = []) {
 
 function computeUpdatePlan(manifest, local, installedHashes) {
   const actions = []
-  const needsForgeInstall =
-    local.installedForgeSha?.toLowerCase() !== manifest.forge.sha256.toLowerCase()
-
-  if (needsForgeInstall) {
-    const forgePath = `forge/forge-${manifest.minecraft}-${manifest.forge.version}-installer.jar`
-    if (installedHashes[forgePath]?.toLowerCase() === manifest.forge.sha256.toLowerCase()) {
-      actions.push({ kind: "skip", path: forgePath, reason: "hash-match" })
-    } else {
-      actions.push({
-        kind: "download",
-        path: forgePath,
-        url: manifest.forge.url,
-        sha256: manifest.forge.sha256,
-        size: manifest.forge.size || 0,
-        category: "forge",
-      })
-    }
-  }
+  const needsForgeInstall = false
 
   const validPaths = new Set()
   for (const file of manifest.files) {
@@ -2201,15 +2303,17 @@ function computeUpdatePlan(manifest, local, installedHashes) {
       }
     }
 
-    if (installedHashes[file.path]?.toLowerCase() === file.sha256.toLowerCase()) {
+    const installed = installedHashes[file.path]
+    const expected = String(file.sha256 || "")
+    if (installed && (!expected || installed.toLowerCase() === expected.toLowerCase())) {
       actions.push({ kind: "skip", path: file.path, reason: "hash-match" })
     } else {
       actions.push({
         kind: "download",
         path: file.path,
         url: file.url,
-        sha256: file.sha256,
-        size: file.size,
+        sha256: expected,
+        size: file.size || 0,
         category: file.type,
       })
     }
@@ -2301,7 +2405,7 @@ async function executeUpdatePlan(root, plan, signal) {
   })
 }
 
-async function resolveJavaForSettings(javaSettings, minMajor, preferredMajor = minMajor) {
+async function resolveJavaForSettings(javaSettings, minMajor, preferredMajor = minMajor, download = false) {
   const configuredPath =
     typeof javaSettings?.executablePath === "string" && javaSettings.executablePath.trim()
       ? javaSettings.executablePath.trim()
@@ -2320,7 +2424,43 @@ async function resolveJavaForSettings(javaSettings, minMajor, preferredMajor = m
     return configured
   }
 
-  return findJava(minMajor, preferredMajor)
+  const found = await findJava(minMajor, preferredMajor)
+  if (found || !download || javaSettings?.autoDownloadRuntime === false) return found
+  return downloadTemurin(preferredMajor)
+}
+
+async function downloadTemurin(major) {
+  const runtimeRoot = path.join(app.getPath("userData"), "runtime", `java-${major}`)
+  const existing = await inspectJava(path.join(runtimeRoot, "bin", javaExecutableName()))
+  if (existing && existing.major >= major) return existing
+
+  emitLaunchProgress({
+    phase: "downloading-java",
+    message: `Downloading Java ${major}...`,
+  })
+  const osName = process.platform === "win32" ? "windows" : process.platform === "darwin" ? "mac" : "linux"
+  const arch = process.arch === "arm64" ? "aarch64" : "x64"
+  const url = `https://api.adoptium.net/v3/binary/latest/${major}/ga/${osName}/${arch}/jre/hotspot/normal/eclipse?project=jdk`
+  const zipPath = path.join(app.getPath("userData"), "runtime", `temurin-${major}.zip`)
+  const extractTo = path.join(app.getPath("userData"), "runtime", `temurin-${major}-extract`)
+  await fs.mkdir(path.dirname(zipPath), { recursive: true })
+  await fs.rm(extractTo, { recursive: true, force: true })
+  await fs.mkdir(extractTo, { recursive: true })
+  await downloadUrlToTemp(url, zipPath, "sha256", "", undefined, () => {})
+  await runProcess("tar", ["-xf", zipPath, "-C", extractTo], {}, undefined)
+  const children = await fs.readdir(extractTo, { withFileTypes: true })
+  const jreDir = children.find((entry) => entry.isDirectory())
+  if (!jreDir) throw new Error("Java archive did not contain a runtime folder.")
+  await fs.rm(runtimeRoot, { recursive: true, force: true })
+  await fs.rename(path.join(extractTo, jreDir.name), runtimeRoot)
+  await fs.rm(extractTo, { recursive: true, force: true }).catch(() => undefined)
+  const installed = await inspectJava(path.join(runtimeRoot, "bin", javaExecutableName()))
+  if (!installed) throw new Error(`Java ${major} downloaded, but the java binary was not found.`)
+  emitLaunchProgress({
+    phase: "downloading-java",
+    message: `Java ${installed.major} is ready.`,
+  })
+  return installed
 }
 
 async function findJava(minMajor, preferredMajor = minMajor) {
@@ -2778,6 +2918,16 @@ async function walkFiles(dir) {
 
 async function sha256File(file) {
   return hashFile(file, "sha256")
+}
+
+async function cachedRuntimeFile(artifact) {
+  if (!artifact?.path || !fsSync.existsSync(artifact.path)) return false
+  if (artifact.size) {
+    const stat = await fs.stat(artifact.path)
+    if (stat.size !== artifact.size) return false
+    return true
+  }
+  return fileMatchesHash(artifact.path, artifact.sha1, "sha1")
 }
 
 async function fileMatchesHash(file, expectedHash, algorithm) {

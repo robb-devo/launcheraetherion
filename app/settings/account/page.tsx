@@ -5,7 +5,7 @@ export default function AccountPage() {
   return (
     <SettingsPage
       title="Account settings"
-      description="Add a player name, or choose which one is active."
+      description="Sign in with Microsoft to play and to own servers."
     >
       <AccountTab />
     </SettingsPage>

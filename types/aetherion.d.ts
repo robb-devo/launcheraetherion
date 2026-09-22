@@ -2,6 +2,12 @@ import type { AccountsState, LauncherSettings, LaunchProgress } from "@/lib/laun
 
 export {}
 
+export type LauncherUpdateState = {
+  status: "idle" | "checking" | "available" | "downloading" | "ready" | "none" | "error"
+  version: string | null
+  message: string
+}
+
 declare global {
   interface Window {
     aetherion?: {
@@ -18,8 +24,12 @@ declare global {
           width: number
           height: number
           autoConnectServer?: boolean
+          isolated?: boolean
           detachProcess?: boolean
           closeOnLaunch?: boolean
+          serverHost?: string
+          serverPort?: number
+          serverName?: string
         }) => Promise<{
           ok: boolean
           target?: {
@@ -65,6 +75,28 @@ declare global {
           }
         } | null>
       }
+      status: {
+        realm: () => Promise<{
+          host: string
+          port: number
+          state: "online" | "offline" | "unknown"
+          online: boolean | null
+          players: { current: number; max: number } | null
+          ping: number | null
+          motd: string | null
+          mojang?: "online" | "unknown"
+        }>
+      }
+      sandbox: {
+        options: () => Promise<import("@/lib/launcher/sandbox").SandboxOptions>
+        list: () => Promise<{ servers: import("@/lib/launcher/sandbox").SandboxServer[] }>
+        create: (
+          input: import("@/lib/launcher/sandbox").SandboxCreateInput,
+        ) => Promise<import("@/lib/launcher/sandbox").SandboxServer>
+        start: (id: string) => Promise<{ ok?: boolean; address?: string; running?: boolean | null }>
+        stop: (id: string) => Promise<{ ok?: boolean; address?: string; running?: boolean | null }>
+        remove: (id: string) => Promise<{ ok?: boolean; id?: string }>
+      }
       launcher: {
         openDataDirectory: () => Promise<{ ok: boolean }>
         openLogsDirectory: () => Promise<{ ok: boolean }>
@@ -74,6 +106,15 @@ declare global {
           removeCount: number
           totalBytes: number
         }>
+      }
+      shell: {
+        openExternal: (url: string) => Promise<{ ok: boolean }>
+      }
+      updater: {
+        get: () => Promise<LauncherUpdateState>
+        check: () => Promise<LauncherUpdateState>
+        install: () => Promise<{ ok: boolean }>
+        onState: (cb: (state: LauncherUpdateState) => void) => () => void
       }
       mods: {
         listDropins: () => Promise<import("@/lib/launcher/types").DropinMod[]>

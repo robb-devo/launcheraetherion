@@ -11,10 +11,16 @@ import {
 } from "@/components/launcher/settings-shell"
 import { DEFAULT_SETTINGS } from "@/lib/launcher/mock-data"
 import { LAUNCHER_BUILD_LABEL, LAUNCHER_VERSION } from "@/lib/launcher/version"
+import type { LauncherUpdateState } from "@/types/aetherion"
 
 export function LauncherTab() {
   const [prefs, setPrefs] = useState(DEFAULT_SETTINGS.launcher)
   const [status, setStatus] = useState("Local settings are ready.")
+  const [update, setUpdate] = useState<LauncherUpdateState>({
+    status: "idle",
+    version: null,
+    message: "Install this version once. Later releases install themselves from GitHub.",
+  })
 
   useEffect(() => {
     window.aetherion?.settings
@@ -24,6 +30,11 @@ export function LauncherTab() {
         console.warn("[aetherion] failed to load launcher settings", err)
         setStatus(err instanceof Error ? err.message : String(err))
       })
+
+    const updater = window.aetherion?.updater
+    if (!updater) return
+    updater.get().then(setUpdate).catch(() => undefined)
+    return updater.onState(setUpdate)
   }, [])
 
   function updatePrefs(next: typeof prefs | ((current: typeof prefs) => typeof prefs)) {
@@ -150,6 +161,43 @@ export function LauncherTab() {
               )
             }
           />
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
+        title="Updates"
+        description="Install 0.3.7 once. Later versions come from GitHub Releases inside this app."
+      >
+        <p className="text-sm text-foreground">{update.message}</p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 bg-transparent"
+            onClick={() => {
+              window.aetherion?.updater
+                .check()
+                .then(setUpdate)
+                .catch((err) => {
+                  console.warn("[aetherion] update check failed", err)
+                })
+            }}
+          >
+            Check for updates
+          </Button>
+          {update.status === "ready" ? (
+            <Button
+              size="sm"
+              className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => {
+                window.aetherion?.updater.install().catch((err) => {
+                  console.warn("[aetherion] failed to install update", err)
+                })
+              }}
+            >
+              Restart and install
+            </Button>
+          ) : null}
         </div>
       </SettingsSection>
 

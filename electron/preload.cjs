@@ -15,6 +15,17 @@ contextBridge.exposeInMainWorld("aetherion", {
       return () => ipcRenderer.off("launch:progress", listener)
     },
   },
+  status: {
+    realm: () => ipcRenderer.invoke("status:realm"),
+  },
+  sandbox: {
+    options: () => ipcRenderer.invoke("sandbox:options"),
+    list: () => ipcRenderer.invoke("sandbox:list"),
+    create: (input) => ipcRenderer.invoke("sandbox:create", input),
+    start: (id) => ipcRenderer.invoke("sandbox:start", id),
+    stop: (id) => ipcRenderer.invoke("sandbox:stop", id),
+    remove: (id) => ipcRenderer.invoke("sandbox:remove", id),
+  },
   accounts: {
     list: () => ipcRenderer.invoke("accounts:list"),
     addOffline: (username) => ipcRenderer.invoke("accounts:addOffline", username),
@@ -38,6 +49,19 @@ contextBridge.exposeInMainWorld("aetherion", {
     openLogsDirectory: () => ipcRenderer.invoke("launcher:openLogsDirectory"),
     clearCache: () => ipcRenderer.invoke("launcher:clearCache"),
     verifyIntegrity: () => ipcRenderer.invoke("launcher:verifyIntegrity"),
+  },
+  shell: {
+    openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
+  },
+  updater: {
+    get: () => ipcRenderer.invoke("updater:get"),
+    check: () => ipcRenderer.invoke("updater:check"),
+    install: () => ipcRenderer.invoke("updater:install"),
+    onState: (cb) => {
+      const listener = (_event, next) => cb(next)
+      ipcRenderer.on("updater:state", listener)
+      return () => ipcRenderer.off("updater:state", listener)
+    },
   },
   mods: {
     listDropins: () => ipcRenderer.invoke("mods:listDropins"),

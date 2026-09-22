@@ -1,21 +1,15 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { FolderOpen, Lock, Plus, RefreshCw, Trash2, Upload } from "lucide-react"
+import { FolderOpen, Lock, RefreshCw, Trash2, Upload } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { SettingsSection } from "@/components/launcher/settings-shell"
 import {
   MOCK_DROPIN_MODS,
   OPTIONAL_MODS,
+  PACK_SHADERS,
   REQUIRED_MODS,
 } from "@/lib/launcher/mock-data"
 import type { DropinMod, ManifestFile } from "@/lib/launcher/types"
@@ -128,6 +122,7 @@ export function ModsTab() {
         </div>
       </SettingsSection>
 
+      {OPTIONAL_MODS.length > 0 ? (
       <SettingsSection
         title={`Optional (${OPTIONAL_MODS.length})`}
         description="You can turn these on or off."
@@ -143,6 +138,7 @@ export function ModsTab() {
           ))}
         </div>
       </SettingsSection>
+      ) : null}
 
       <SettingsSection
         title="Drop-in Mods"
@@ -217,23 +213,22 @@ export function ModsTab() {
 
       <SettingsSection
         title="Shaderpacks"
-        description="Shaders need a capable PC. Install Iris or Oculus for support."
+        description="Iris loads the pack shader when the game starts."
       >
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-9 w-9 bg-transparent">
-            <Plus className="size-4" />
-          </Button>
-          <Select defaultValue="off">
-            <SelectTrigger className="h-9 flex-1 bg-input/40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="off">Off (Default)</SelectItem>
-              <SelectItem value="complementary">Complementary Shaders v4.7</SelectItem>
-              <SelectItem value="bsl">BSL Shaders v8.2</SelectItem>
-              <SelectItem value="sildurs">Sildur&apos;s Vibrant Shaders</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="rounded-lg border border-border/50 divide-y divide-border/40">
+          {PACK_SHADERS.map((shader) => (
+            <div key={shader.slug} className="flex items-center gap-4 px-4 py-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">{shader.slug}</p>
+                <p className="text-[11px] text-muted-foreground font-mono truncate">
+                  {shader.filename}
+                </p>
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 text-primary text-xs">
+                {shader.enable === false ? "Off" : "Enabled"}
+              </div>
+            </div>
+          ))}
         </div>
       </SettingsSection>
     </>
@@ -288,7 +283,11 @@ function ModRow({
           )}
         </div>
         <p className="text-[11px] text-muted-foreground">
-          {mod.version && `v${mod.version}`}
+        {mod.version
+          ? mod.version.endsWith(".jar") || mod.version.endsWith(".zip")
+            ? mod.version
+            : `v${mod.version}`
+          : null}
           {mod.version && mod.author && " • "}
           {mod.author}
         </p>
