@@ -9,6 +9,7 @@ const {
   packServer,
   assertClientPack,
 } = require("./lib/pack-manifest.cjs")
+const { clientJarArtifact } = require("./lib/client-jar.cjs")
 const { spawn } = require("node:child_process")
 const crypto = require("node:crypto")
 const fsSync = require("node:fs")
@@ -121,10 +122,28 @@ function createWindow() {
   }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    const target = externalHttpsUrl(url)
+    if (target) shell.openExternal(target)
     return { action: "deny" }
   })
 }
+
+function externalHttpsUrl(value) {
+  try {
+    const url = new URL(String(value || ""))
+    if (url.protocol !== "https:") return null
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+ipcMain.handle("shell:openExternal", async (_event, value) => {
+  const target = externalHttpsUrl(value)
+  if (!target) throw new Error("That link cannot be opened.")
+  await shell.openExternal(target)
+  return { ok: true }
+})
 
 function registerStaticAppProtocol() {
   protocol.handle(APP_PROTOCOL, async (request) => {
@@ -921,9 +940,13 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
   const libraryDirectory = path.join(root, "libraries")
   const assetsRoot = path.join(root, "assets")
   const nativesDirectory = path.join(root, "natives", profileId)
-  const clientJar = path.join(root, "versions", parentId, `${parentId}.jar`)
+  const clientArtifact = clientJarArtifact(root, parentId, parentProfile)
+  const clientJar = clientArtifact.path
   const libraryPlan = collectLibraries(root, merged.libraries)
   const includeVanillaClientJar = !isForgeProfile(forgeProfile)
+  const clientReady = includeVanillaClientJar
+    ? await fileMatchesHash(clientJar, clientArtifact.sha1, "sha1")
+    : true
   const classpathEntries = includeVanillaClientJar
     ? [...libraryPlan.classpath, clientJar]
     : libraryPlan.classpath
@@ -989,9 +1012,7 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
   const missing = [
     ...libraryPlan.missing,
     ...libraryPlan.missingNatives,
-    ...(includeVanillaClientJar && !fsSync.existsSync(clientJar)
-      ? [toPosix(path.relative(root, clientJar))]
-      : []),
+    ...(includeVanillaClientJar && !clientReady ? [clientArtifact.relativePath] : []),
     ...assetPlan.missing,
   ]
 
@@ -1005,6 +1026,7 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
     mainClass: merged.mainClass,
     classpathEntries,
     includeVanillaClientJar,
+    clientJar: includeVanillaClientJar ? clientArtifact : null,
     libraryArtifacts: libraryPlan.artifacts,
     nativeArtifacts: libraryPlan.nativeArtifacts,
     nativesDirectory,
@@ -1521,6 +1543,14 @@ function writeUInt16(value) {
 }
 
 async function prepareMinecraftRuntime(root, launchPlan, signal) {
+  if (launchPlan.clientJar && !(await fileMatchesHash(launchPlan.clientJar.path, launchPlan.clientJar.sha1, "sha1"))) {
+    await downloadRuntimeArtifacts(
+      [launchPlan.clientJar],
+      signal,
+      `Downloading Minecraft ${launchPlan.parentId}`,
+    )
+  }
+
   const artifacts = uniqueArtifacts([
     ...launchPlan.libraryArtifacts,
     ...launchPlan.nativeArtifacts,
@@ -1528,7 +1558,7 @@ async function prepareMinecraftRuntime(root, launchPlan, signal) {
   const libraryDownloads = []
 
   for (const artifact of artifacts) {
-    if (!(await fileMatchesHash(artifact.path, artifact.sha1, "sha1"))) {
+    if (!(await cachedRuntimeFile(artifact))) {
       libraryDownloads.push(artifact)
     }
   }
@@ -1555,7 +1585,7 @@ async function prepareMinecraftRuntime(root, launchPlan, signal) {
   for (const [name, object] of Object.entries(assetIndex.objects || {})) {
     if (!object?.hash) continue
     const asset = assetObjectArtifact(root, name, object)
-    if (!(await fileMatchesHash(asset.path, asset.sha1, "sha1"))) {
+    if (!(await cachedRuntimeFile(asset))) {
       assetDownloads.push(asset)
     }
   }
@@ -2864,6 +2894,16 @@ async function walkFiles(dir) {
 
 async function sha256File(file) {
   return hashFile(file, "sha256")
+}
+
+async function cachedRuntimeFile(artifact) {
+  if (!artifact?.path || !fsSync.existsSync(artifact.path)) return false
+  if (artifact.size) {
+    const stat = await fs.stat(artifact.path)
+    if (stat.size !== artifact.size) return false
+    return true
+  }
+  return fileMatchesHash(artifact.path, artifact.sha1, "sha1")
 }
 
 async function fileMatchesHash(file, expectedHash, algorithm) {

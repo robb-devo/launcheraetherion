@@ -239,16 +239,12 @@ export function Dashboard() {
               <IconLink href="/settings/account" label="Settings">
                 <Cog className="size-4" />
               </IconLink>
-              {WEBSITE_URL ? (
-                <IconLink href={WEBSITE_URL} label="Site">
-                  <Globe className="size-4" />
-                </IconLink>
-              ) : null}
-              {DISCORD_URL ? (
-                <IconLink href={DISCORD_URL} label="Discord">
-                  <DiscordMark />
-                </IconLink>
-              ) : null}
+              <IconLink href={WEBSITE_URL} label="Site">
+                <Globe className="size-4" />
+              </IconLink>
+              <IconLink href={DISCORD_URL} label="Discord">
+                <DiscordMark />
+              </IconLink>
             </div>
 
             <div className="col-span-4 flex items-center justify-end gap-4">
@@ -358,9 +354,23 @@ function IconLink({
     "inline-flex size-9 items-center justify-center rounded-lg border border-white/10 bg-white/4 text-muted-foreground transition duration-200 hover:-translate-y-px hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
   if (href.startsWith("http")) {
     return (
-      <a href={href} target="_blank" rel="noreferrer" aria-label={label} className={className}>
+      <button
+        type="button"
+        aria-label={label}
+        className={className}
+        onClick={() => {
+          const open = window.aetherion?.shell?.openExternal
+          if (open) {
+            open(href).catch((err) => {
+              console.warn("[aetherion] failed to open link", err)
+            })
+            return
+          }
+          window.open(href, "_blank", "noopener,noreferrer")
+        }}
+      >
         {children}
-      </a>
+      </button>
     )
   }
   return (

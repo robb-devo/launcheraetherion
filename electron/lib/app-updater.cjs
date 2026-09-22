@@ -14,7 +14,7 @@ const FEED = {
 let state = {
   status: "idle",
   version: null,
-  message: "Install 0.3.6 once. Later versions arrive through this app.",
+  message: "Install 0.3.7 once. Later versions arrive through this app.",
 }
 let autoUpdater = null
 let started = false

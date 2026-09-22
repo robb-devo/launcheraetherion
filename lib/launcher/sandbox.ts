@@ -2,7 +2,7 @@ export type SandboxType = "vanilla" | "paper" | "fabric" | "purpur"
 export type SandboxPreset = "light" | "balanced" | "performance" | "max" | "custom"
 
 export interface SandboxPresetOption {
-  value: Exclude<SandboxPreset, "custom">
+  value: string
   label: string
   blurb: string
   ramGb: number
@@ -58,10 +58,8 @@ export interface SandboxCreateInput {
 }
 
 export const SANDBOX_PRESETS: SandboxPresetOption[] = [
-  { value: "light", label: "Light", blurb: "Quick tests", ramGb: 2, cpuCores: 1 },
-  { value: "balanced", label: "Balanced", blurb: "Friends", ramGb: 4, cpuCores: 2 },
-  { value: "performance", label: "Performance", blurb: "Heavier worlds", ramGb: 6, cpuCores: 3 },
-  { value: "max", label: "Max", blurb: "Largest sandbox", ramGb: 8, cpuCores: 4 },
+  { value: "16", label: "16 GB", blurb: "Default", ramGb: 16, cpuCores: 4 },
+  { value: "24", label: "24 GB", blurb: "Larger worlds", ramGb: 24, cpuCores: 4 },
 ]
 
 export const SANDBOX_TYPES: SandboxTypeOption[] = [

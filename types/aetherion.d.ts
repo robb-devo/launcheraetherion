@@ -106,6 +106,9 @@ declare global {
           totalBytes: number
         }>
       }
+      shell: {
+        openExternal: (url: string) => Promise<{ ok: boolean }>
+      }
       updater: {
         get: () => Promise<LauncherUpdateState>
         check: () => Promise<LauncherUpdateState>

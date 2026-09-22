@@ -1,5 +1,5 @@
-/** Leave empty to hide the button. Do not invent a URL. */
-export const DISCORD_URL = ""
+/** Shown on the dashboard. Opened with the system browser. */
+export const DISCORD_URL = "https://discord.gg/aetherion"
 
-/** Leave empty to hide the button. Do not invent a URL. */
-export const WEBSITE_URL = ""
+/** Shown on the dashboard. Opened with the system browser. */
+export const WEBSITE_URL = "https://donnernet.de"

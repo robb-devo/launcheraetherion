@@ -50,6 +50,9 @@ contextBridge.exposeInMainWorld("aetherion", {
     clearCache: () => ipcRenderer.invoke("launcher:clearCache"),
     verifyIntegrity: () => ipcRenderer.invoke("launcher:verifyIntegrity"),
   },
+  shell: {
+    openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
+  },
   updater: {
     get: () => ipcRenderer.invoke("updater:get"),
     check: () => ipcRenderer.invoke("updater:check"),

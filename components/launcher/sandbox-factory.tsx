@@ -12,7 +12,6 @@ import {
   SANDBOX_TYPES,
   type SandboxCreateInput,
   type SandboxOptions,
-  type SandboxPreset,
   type SandboxServer,
   type SandboxType,
 } from "@/lib/launcher/sandbox"
@@ -33,7 +32,7 @@ export function SandboxFactory() {
   const [name, setName] = useState("")
   const [serverType, setServerType] = useState<SandboxType>("paper")
   const [version, setVersion] = useState("")
-  const [preset, setPreset] = useState<Exclude<SandboxPreset, "custom">>("balanced")
+  const [preset, setPreset] = useState("16")
   const [account, setAccount] = useState<Account | null>(null)
   const [settings, setSettings] = useState<LauncherSettings | null>(null)
   const [busy, setBusy] = useState(false)
@@ -46,7 +45,7 @@ export function SandboxFactory() {
     if (version && versions.includes(version)) return version
     return versions[0] || version
   }, [version, versions])
-  const presetInfo = options.presets.find((item) => item.value === preset) ?? SANDBOX_PRESETS[1]
+  const presetInfo = SANDBOX_PRESETS.find((item) => item.value === preset) ?? SANDBOX_PRESETS[0]
 
   useEffect(() => {
     if (!window.aetherion?.launch) return
@@ -82,7 +81,7 @@ export function SandboxFactory() {
     setOptions({
       ...EMPTY_OPTIONS,
       ...nextOptions,
-      presets: nextOptions.presets?.length ? nextOptions.presets : SANDBOX_PRESETS,
+      presets: SANDBOX_PRESETS,
       serverTypes: serverTypes.length ? serverTypes : SANDBOX_TYPES,
       versions: nextOptions.versions || {},
     })
@@ -117,7 +116,7 @@ export function SandboxFactory() {
       version: selectedVersion,
       ramGb: presetInfo.ramGb,
       cpuCores: presetInfo.cpuCores,
-      preset,
+      preset: "custom",
       onlineMode: true,
       startAfterCreate: true,
     }
@@ -266,7 +265,7 @@ export function SandboxFactory() {
 
             <p className="mt-5 text-xs uppercase tracking-[0.16em] text-muted-foreground">RAM / CPU</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {options.presets.map((item) => (
+              {SANDBOX_PRESETS.map((item) => (
                 <Chip key={item.value} active={preset === item.value} onClick={() => setPreset(item.value)}>
                   {item.label}
                   <span className="ml-2 text-[10px] text-muted-foreground">
