@@ -50,6 +50,16 @@ contextBridge.exposeInMainWorld("aetherion", {
     clearCache: () => ipcRenderer.invoke("launcher:clearCache"),
     verifyIntegrity: () => ipcRenderer.invoke("launcher:verifyIntegrity"),
   },
+  updater: {
+    get: () => ipcRenderer.invoke("updater:get"),
+    check: () => ipcRenderer.invoke("updater:check"),
+    install: () => ipcRenderer.invoke("updater:install"),
+    onState: (cb) => {
+      const listener = (_event, next) => cb(next)
+      ipcRenderer.on("updater:state", listener)
+      return () => ipcRenderer.off("updater:state", listener)
+    },
+  },
   mods: {
     listDropins: () => ipcRenderer.invoke("mods:listDropins"),
     addDropins: () => ipcRenderer.invoke("mods:addDropins"),

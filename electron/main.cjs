@@ -2,6 +2,7 @@ const { app, BrowserWindow, dialog, ipcMain, protocol, shell } = require("electr
 const controlApi = require("./lib/control.cjs")
 const microsoftAuth = require("./lib/microsoft.cjs")
 const { probeRealm } = require("./lib/realm-status.cjs")
+const { startAppUpdater } = require("./lib/app-updater.cjs")
 const {
   normalizePackManifest,
   fabricProfileId,
@@ -210,6 +211,7 @@ function appIconPath() {
 app.whenReady().then(async () => {
   if (!isDev) registerStaticAppProtocol()
   createWindow()
+  startAppUpdater()
 })
 
 app.on("window-all-closed", () => {

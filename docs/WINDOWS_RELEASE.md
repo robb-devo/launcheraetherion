@@ -4,7 +4,7 @@
 
 This build keeps the 0.3.4 window, dashboard, and settings. Play installs the Fabric pack (loader 0.19.5), Java 21, and connects to `play.donnernet.de:25565`. Microsoft sign-in is required to play. Your server talks to the control API. See `docs/SANDBOX_API.md` and `README.md`.
 
-Players install `Aetherion.Launcher.Setup.0.3.6.exe`. NSIS upgrades the same app id (`gg.aetherion.launcher`) and leaves that AppData folder in place. The taskbar id is the same app id, so the launcher is one button. The Microsoft window uses `skipTaskbar`.
+Players install `Aetherion.Launcher.Setup.0.3.6.exe` once. That build checks GitHub Releases for `latest.yml` and installs newer versions inside the app. NSIS upgrades the same app id (`gg.aetherion.launcher`) and leaves the AppData folder in place. The taskbar id is the same app id, so the launcher is one button. The Microsoft window uses `skipTaskbar`.
 
 ### Version
 
@@ -31,18 +31,21 @@ git tag v0.3.6
 git push origin v0.3.6
 ```
 
-3. Wait for `Build Windows Release`. It runs `pnpm build:win:ci` and uploads:
+3. Wait for `Build Windows Release`. It runs `pnpm build:win:ci` and uploads a published release:
 
-- `dist/Aetherion.Launcher.Setup.0.3.6.exe`
+- `dist/latest.yml` (required; installed clients read this)
+- `dist/Aetherion.Launcher.Setup.0.3.6.exe` (one-time installer)
 - `dist/Aetherion.Launcher.Setup.0.3.6.exe.blockmap`
 
-4. Confirm:
+4. Confirm the release is not a draft and that `latest.yml` is attached:
 
 ```txt
-https://github.com/robb-devo/launcheraetherion/releases/download/v0.3.5/Aetherion.Launcher.Setup.0.3.5.exe
+https://github.com/robb-devo/launcheraetherion/releases/latest/download/latest.yml
 ```
 
-Do not republish the modpack `v0.4` jars. Modpack files still download from `washryan/launcheraetherion`.
+Anyone already on 0.3.6 or newer receives the next version in the app. The setup executable is only the first install.
+
+Do not republish the old Forge modpack. The client pack is the Fabric manifest shipped in the app.
 
 ### Publish from a Windows machine
 

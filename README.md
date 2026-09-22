@@ -17,9 +17,11 @@ The installer is written to:
 dist/Aetherion.Launcher.Setup.0.3.6.exe
 ```
 
-`pnpm build:win` exports the interface and runs electron-builder (NSIS, x64). The client pack is `public/manifest.json` (Minecraft 1.21.1, Fabric). The packaged app keeps the Electron shell, the exported UI, and the Microsoft sign-in library. It does not pack the Next.js toolchain.
+`pnpm build:win` exports the interface and runs electron-builder (NSIS, x64). The client pack is `public/manifest.json` (Minecraft 1.21.1, Fabric). The build also writes `dist/latest.yml`, which installed launchers use to find the next GitHub Release. The packaged app keeps the Electron shell, the exported UI, Microsoft sign-in, and `electron-updater`. It does not pack the Next.js toolchain.
 
-GitHub Actions (`Build Windows Release`) uses `pnpm build:win:ci` on tag `v0.3.6`. That produces `Aetherion.Launcher.Setup.0.3.6.exe`.
+GitHub Actions (`Build Windows Release`) uses `pnpm build:win:ci` on tag `v0.3.6`. The release assets are the installer, its blockmap, and `latest.yml`.
+
+Install `Aetherion.Launcher.Setup.0.3.6.exe` once. After that, newer versions download and install from inside the app. Do not keep replacing the setup file by hand.
 
 This Linux checkout cannot produce the NSIS installer. Use Windows or the release workflow.
 

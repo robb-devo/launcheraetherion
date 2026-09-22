@@ -2,6 +2,12 @@ import type { AccountsState, LauncherSettings, LaunchProgress } from "@/lib/laun
 
 export {}
 
+export type LauncherUpdateState = {
+  status: "idle" | "checking" | "available" | "downloading" | "ready" | "none" | "error"
+  version: string | null
+  message: string
+}
+
 declare global {
   interface Window {
     aetherion?: {
@@ -99,6 +105,12 @@ declare global {
           removeCount: number
           totalBytes: number
         }>
+      }
+      updater: {
+        get: () => Promise<LauncherUpdateState>
+        check: () => Promise<LauncherUpdateState>
+        install: () => Promise<{ ok: boolean }>
+        onState: (cb: (state: LauncherUpdateState) => void) => () => void
       }
       mods: {
         listDropins: () => Promise<import("@/lib/launcher/types").DropinMod[]>

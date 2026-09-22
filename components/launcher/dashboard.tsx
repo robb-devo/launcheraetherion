@@ -14,6 +14,7 @@ import { publicAssetPath } from "@/lib/public-path"
 import { LAUNCHER_VERSION } from "@/lib/launcher/version"
 import { AetherionMark } from "./aetherion-mark"
 import { LaunchProgressOverlay } from "./launch-progress"
+import type { LauncherUpdateState } from "@/types/aetherion"
 
 type RealmStatus = {
   state: "online" | "offline" | "unknown"
@@ -183,6 +184,8 @@ export function Dashboard() {
           </div>
         </div>
 
+        <UpdateNotice />
+
         <footer className="px-6 pb-6">
           <div className="aetherion-dock grid grid-cols-12 items-center gap-5 rounded-2xl px-5 py-4">
             <div className="col-span-5 flex items-center gap-6">
@@ -286,6 +289,38 @@ export function Dashboard() {
           onDismiss={() => setProgress(null)}
         />
       )}
+    </div>
+  )
+}
+
+function UpdateNotice() {
+  const [update, setUpdate] = useState<LauncherUpdateState | null>(null)
+
+  useEffect(() => {
+    const updater = window.aetherion?.updater
+    if (!updater) return
+    updater.get().then(setUpdate).catch(() => undefined)
+    return updater.onState(setUpdate)
+  }, [])
+
+  if (!update || (update.status !== "downloading" && update.status !== "ready")) return null
+
+  return (
+    <div className="mx-6 mb-3 flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-background/75 px-4 py-2 backdrop-blur-md">
+      <p className="text-sm text-foreground">{update.message}</p>
+      {update.status === "ready" ? (
+        <Button
+          size="sm"
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
+          onClick={() => {
+            window.aetherion?.updater.install().catch((err) => {
+              console.warn("[aetherion] failed to install update", err)
+            })
+          }}
+        >
+          Restart
+        </Button>
+      ) : null}
     </div>
   )
 }

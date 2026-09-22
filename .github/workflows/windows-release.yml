@@ -40,12 +40,19 @@ jobs:
       - name: Build Windows installer
         run: pnpm build:win:ci
 
+      - name: Require in-app update metadata
+        shell: pwsh
+        run: |
+          if (-not (Test-Path dist/latest.yml)) { throw "dist/latest.yml is missing. Installed clients cannot see this release." }
+          if (-not (Test-Path dist/*.exe.blockmap)) { throw "The installer blockmap is missing." }
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: Aetherion Launcher ${{ env.RELEASE_TAG }}
           files: |
+            dist/latest.yml
             dist/Aetherion.Launcher.Setup.*.exe
             dist/Aetherion.Launcher.Setup.*.exe.blockmap
           fail_on_unmatched_files: true
