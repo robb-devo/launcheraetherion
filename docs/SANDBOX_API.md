@@ -55,3 +55,43 @@ That does not restart Crafty or the live Minecraft network. Until those are set,
 ## Host restart
 
 After #5 is merged, restart the API on the host (`sudo systemctl restart aetherion-control`). Leave `LAUNCHER_SERVICE_KEY` unset so the baked bearer is accepted. A signed-in Microsoft account should then list and create only that player’s servers.
+
+## Playtime
+
+There is no playtime HTTP route. AetherionCore stores the network total and reads it with `AetherServices.playtime().seconds(uuid)` ([aetherion-plugins #50](https://github.com/robb-devo/aetherion-plugins/pull/50)). The launcher does not call Control for this and does not show a playtime row.
+
+When a later Control response includes that same integer, the home screen shows it and nothing else:
+
+```json
+{ "totalSeconds": 12345 }
+```
+
+`totalSeconds` may also arrive as `playtime.totalSeconds` or `player.totalSeconds`. A missing field stays hidden. Zero is shown only when the payload sends `0`.
+
+## Linked modpack
+
+A sandbox may include an optional client pack. When `versionId` is present and `source` is omitted or `modrinth`, Play installs that Modrinth version into its own instance and joins the sandbox with the pack's Minecraft version.
+
+```json
+{
+  "modpack": {
+    "source": "modrinth",
+    "projectId": "aabbccdd",
+    "versionId": "11223344",
+    "slug": "example-pack",
+    "name": "Example Pack"
+  }
+}
+```
+
+Without `modpack`, Play keeps the current behavior: match `version`, and use the Aetherion Fabric pack only when that version is 1.21.1.
+
+## Plugins
+
+There is no plugin install route. `plugins` on a server object is rendered read-only when Control already sends it:
+
+```json
+{ "plugins": [{ "id": "essentials", "name": "Essentials" }] }
+```
+
+Install and removal stay unwired until Control adds `GET` / `POST` / `DELETE /api/sandbox/servers/:id/plugins`. The launcher does not call Crafty.

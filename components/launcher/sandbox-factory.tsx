@@ -216,9 +216,21 @@ export function SandboxFactory() {
     const port = Number(portText)
     setProgress({ phase: "fetching-manifest", message: "Fetching the pack..." })
     try {
+      const linkedPack =
+        server.modpack?.versionId && (!server.modpack.source || server.modpack.source === "modrinth")
+          ? server.modpack
+          : null
+      const linked = linkedPack
+        ? await window.aetherion.instances?.ensurePack({
+            projectId: linkedPack.projectId,
+            versionId: linkedPack.versionId || "",
+            slug: linkedPack.slug || linkedPack.projectId,
+            name: linkedPack.name,
+          })
+        : null
       await window.aetherion.launch.start({
         accountId: account.id,
-        instanceId: CLIENT_PACK.id,
+        instanceId: linked?.id || CLIENT_PACK.id,
         fullscreen: settings?.minecraft.fullscreen ?? false,
         width: settings?.minecraft.resolution.width ?? 1280,
         height: settings?.minecraft.resolution.height ?? 720,
@@ -229,7 +241,8 @@ export function SandboxFactory() {
         serverHost: host,
         serverPort: Number.isInteger(port) ? port : undefined,
         serverName: server.name,
-        minecraftVersion: server.version,
+        minecraftVersion: linked?.minecraftVersion || server.version,
+        ...(linked ? { instanceKind: "modrinth" as const } : {}),
       })
       window.setTimeout(() => {
         setProgress((current) => (current?.phase === "running" ? null : current))
@@ -550,6 +563,25 @@ function SandboxDetail({
         <Fact label="Gamemode" value={server.gamemode || "—"} />
         <Fact label="Online mode" value={server.onlineMode == null ? "—" : server.onlineMode ? "On" : "Off"} />
       </dl>
+
+      <p className="mt-4 text-xs text-muted-foreground">
+        {server.modpack?.versionId
+          ? `Play installs the linked Modrinth pack${server.modpack.name ? ` (${server.modpack.name})` : ""} and matches Minecraft ${server.version}.`
+          : `Play matches Minecraft ${server.version}. No Modrinth pack is linked on this server.`}
+      </p>
+
+      <p className="aetherion-kicker mt-6">Plugins</p>
+      {server.plugins && server.plugins.length > 0 ? (
+        <ul className="mt-2 space-y-1 text-sm text-foreground">
+          {server.plugins.map((plugin) => (
+            <li key={plugin.id || plugin.name}>{plugin.name || plugin.id}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Control does not expose plugin install or removal yet. This list stays empty until the server payload includes a plugins array.
+        </p>
+      )}
 
       <p className="mt-4 text-xs text-muted-foreground">
         Plugins and the console are not on the friend-key API. Start, stop, restart, and delete are. World values are the ones stored when this server was created.

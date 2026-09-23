@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("aetherion", {
   },
   status: {
     realm: () => ipcRenderer.invoke("status:realm"),
+    playtime: () => ipcRenderer.invoke("status:playtime"),
   },
   sandbox: {
     options: () => ipcRenderer.invoke("sandbox:options"),
@@ -27,6 +28,7 @@ contextBridge.exposeInMainWorld("aetherion", {
     remove: (id) => ipcRenderer.invoke("sandbox:remove", id),
     restart: (id) => ipcRenderer.invoke("sandbox:restart", id),
     inspect: (id) => ipcRenderer.invoke("sandbox:inspect", id),
+    plugins: () => ipcRenderer.invoke("sandbox:plugins"),
   },
   accounts: {
     list: () => ipcRenderer.invoke("accounts:list"),
@@ -67,6 +69,25 @@ contextBridge.exposeInMainWorld("aetherion", {
   },
   minecraft: {
     versions: () => ipcRenderer.invoke("minecraft:versions"),
+  },
+  instances: {
+    list: () => ipcRenderer.invoke("instances:list"),
+    select: (id) => ipcRenderer.invoke("instances:select", id),
+    remove: (id) => ipcRenderer.invoke("instances:remove", id),
+    mods: (id) => ipcRenderer.invoke("instances:mods", id),
+    removeMod: (id, filename) => ipcRenderer.invoke("instances:removeMod", { id, filename }),
+    open: (id) => ipcRenderer.invoke("instances:open", id),
+    install: (input) => ipcRenderer.invoke("instances:install", input),
+    ensurePack: (input) => ipcRenderer.invoke("instances:ensurePack", input),
+    onProgress: (cb) => {
+      const listener = (_event, progress) => cb(progress)
+      ipcRenderer.on("instances:progress", listener)
+      return () => ipcRenderer.off("instances:progress", listener)
+    },
+  },
+  modrinth: {
+    search: (query) => ipcRenderer.invoke("modrinth:search", query),
+    versions: (projectId) => ipcRenderer.invoke("modrinth:versions", projectId),
   },
   mods: {
     listPack: () => ipcRenderer.invoke("mods:listPack"),
