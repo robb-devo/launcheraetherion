@@ -8,6 +8,8 @@ const os = require("node:os")
 const path = require("node:path")
 const zlib = require("node:zlib")
 
+const controlApi = require("./lib/control.cjs")
+
 const isDev = !app.isPackaged
 const USERNAME_REGEX = /^[A-Za-z0-9_]{3,16}$/
 const LAUNCHER_NAME = "AetherionLauncher"
@@ -272,6 +274,30 @@ ipcMain.handle("accounts:getDataPath", () => accountsPath())
 ipcMain.handle("accounts:addMicrosoft", () => {
   throw new Error("Microsoft sign-in is not available in this build yet.")
 })
+
+async function microsoftPlayerId() {
+  const state = await readAccountsState()
+  const account = state.accounts.find((candidate) => candidate.id === state.activeId)
+  if (!account || account.type !== "microsoft") {
+    throw new Error("Sign in with Microsoft before using sandboxes.")
+  }
+  return account.uuid
+}
+
+ipcMain.handle("sandbox:options", async () => controlApi.sandboxOptions(await microsoftPlayerId()))
+ipcMain.handle("sandbox:list", async () => controlApi.sandboxList(await microsoftPlayerId()))
+ipcMain.handle("sandbox:create", async (_event, input) =>
+  controlApi.sandboxCreate(await microsoftPlayerId(), input),
+)
+ipcMain.handle("sandbox:start", async (_event, id) =>
+  controlApi.sandboxStart(await microsoftPlayerId(), id),
+)
+ipcMain.handle("sandbox:stop", async (_event, id) =>
+  controlApi.sandboxStop(await microsoftPlayerId(), id),
+)
+ipcMain.handle("sandbox:remove", async (_event, id) =>
+  controlApi.sandboxDelete(await microsoftPlayerId(), id),
+)
 
 ipcMain.handle("settings:get", () => readLauncherSettings())
 ipcMain.handle("settings:update", async (_event, patch) => {

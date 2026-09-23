@@ -1,4 +1,5 @@
 import type { AccountsState, LauncherSettings, LaunchProgress } from "@/lib/launcher/types"
+import type { SandboxCreateInput, SandboxServer } from "@/lib/launcher/sandbox"
 
 export {}
 
@@ -29,6 +30,14 @@ declare global {
         }>
         cancel: () => Promise<{ ok: boolean }>
         onProgress: (cb: (progress: LaunchProgress) => void) => () => void
+      }
+      sandbox: {
+        options: () => Promise<unknown>
+        list: () => Promise<{ servers: SandboxServer[] }>
+        create: (input: SandboxCreateInput) => Promise<SandboxServer>
+        start: (id: string) => Promise<unknown>
+        stop: (id: string) => Promise<unknown>
+        remove: (id: string) => Promise<unknown>
       }
       accounts: {
         list: () => Promise<AccountsState>

@@ -20,6 +20,7 @@ import { publicAssetPath } from "@/lib/public-path"
 import { LAUNCHER_VERSION } from "@/lib/launcher/version"
 import { AetherionMark } from "./aetherion-mark"
 import { LaunchProgressOverlay } from "./launch-progress"
+import { SandboxButton } from "./sandbox-button"
 
 export function Dashboard() {
   const router = useRouter()
@@ -142,10 +143,15 @@ export function Dashboard() {
           </div>
 
           {activeAccount ? (
-            <AccountBadge
-              username={activeAccount.username}
-              avatarUrl={activeAccount.avatarUrl}
-            />
+            <div className="flex items-center gap-2.5">
+              {activeAccount.type === "microsoft" ? (
+                <SandboxButton minecraftVersion={MOCK_MANIFEST.minecraft} />
+              ) : null}
+              <AccountBadge
+                username={activeAccount.username}
+                avatarUrl={activeAccount.avatarUrl}
+              />
+            </div>
           ) : (
             <Button asChild variant="outline" className="h-11 border-white/10 bg-background/50 px-5 backdrop-blur-md">
               <Link href="/login">Sign in</Link>
