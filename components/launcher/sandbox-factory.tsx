@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Play, RotateCcw, Square, Trash2 } from "lucide-react"
@@ -43,6 +43,7 @@ export function SandboxFactory() {
   const [inspected, setInspected] = useState<SandboxServer | null>(null)
   const [live, setLive] = useState<SandboxLiveStatus | null>(null)
   const [progress, setProgress] = useState<LaunchProgress | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const versions = options.versions?.[serverType] ?? []
   const selectedVersion = useMemo(() => {
@@ -72,6 +73,10 @@ export function SandboxFactory() {
       .catch(() => undefined)
     void refresh().catch((err) => setError(readableError(err, "Could not load servers.")))
   }, [])
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 })
+  }, [selectedId])
 
   useEffect(() => {
     if (!selectedId || !window.aetherion?.sandbox?.inspect) return
@@ -244,7 +249,43 @@ export function SandboxFactory() {
           </Link>
         </header>
 
-        <div className="aetherion-scroll min-h-0 flex-1 space-y-6 overflow-y-auto px-8 py-6">
+        <div ref={scrollRef} className="aetherion-scroll min-h-0 flex-1 space-y-6 overflow-y-auto px-8 py-6">
+          {selected ? (
+            <SandboxDetail
+              server={selected}
+              live={live}
+              busy={busy}
+              error={error}
+              notice={notice}
+              onBack={() => {
+                setSelectedId(null)
+                setInspected(null)
+                setLive(null)
+              }}
+              onStart={() =>
+                void runAction(() => window.aetherion!.sandbox.start(selected.id), `Start queued · ${selected.address}`)
+              }
+              onStop={() =>
+                void runAction(() => window.aetherion!.sandbox.stop(selected.id), `Stop queued · ${selected.address}`)
+              }
+              onRestart={() =>
+                void runAction(
+                  () => window.aetherion!.sandbox.restart(selected.id),
+                  `Restart queued · ${selected.address}`,
+                )
+              }
+              onDelete={() =>
+                void runAction(async () => {
+                  const result = await window.aetherion!.sandbox.remove(selected.id)
+                  setSelectedId(null)
+                  setInspected(null)
+                  return result
+                }, `${selected.name} deleted.`)
+              }
+              onPlay={() => void play(selected)}
+            />
+          ) : (
+          <>
           <section className="aetherion-glass rounded-2xl p-5">
             <p className="aetherion-kicker">New server</p>
             <label className="mt-4 block text-xs uppercase tracking-[0.16em] text-muted-foreground">
@@ -329,39 +370,7 @@ export function SandboxFactory() {
 
           <section>
             <p className="aetherion-kicker">Your servers</p>
-            {selected ? (
-              <SandboxDetail
-                server={selected}
-                live={live}
-                busy={busy}
-                onBack={() => {
-                  setSelectedId(null)
-                  setInspected(null)
-                  setLive(null)
-                }}
-                onStart={() =>
-                  void runAction(() => window.aetherion!.sandbox.start(selected.id), `Start queued · ${selected.address}`)
-                }
-                onStop={() =>
-                  void runAction(() => window.aetherion!.sandbox.stop(selected.id), `Stop queued · ${selected.address}`)
-                }
-                onRestart={() =>
-                  void runAction(
-                    () => window.aetherion!.sandbox.restart(selected.id),
-                    `Restart queued · ${selected.address}`,
-                  )
-                }
-                onDelete={() =>
-                  void runAction(async () => {
-                    const result = await window.aetherion!.sandbox.remove(selected.id)
-                    setSelectedId(null)
-                    setInspected(null)
-                    return result
-                  }, `${selected.name} deleted.`)
-                }
-                onPlay={() => void play(selected)}
-              />
-            ) : servers.length === 0 ? (
+            {servers.length === 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">No servers yet for this Microsoft account.</p>
             ) : (
               <div className="mt-3 space-y-3">
@@ -372,68 +381,39 @@ export function SandboxFactory() {
                     className="flex cursor-pointer flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-background/55 px-4 py-4 transition hover:border-primary/40"
                   >
                     <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedId(server.id)}>
-                      <p className="font-medium text-foreground">{server.name}</p>
+                      <p className="font-semibold text-foreground">{server.name}</p>
                       <p className="mt-1 font-mono text-sm text-primary">{server.address}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {server.serverType} {server.version} · {server.ramGb}G / {server.cpuCores}C · Open
-                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">{serverMeta(server)}</p>
                     </button>
-                    <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() =>
-                          void runAction(
-                            () => window.aetherion!.sandbox.start(server.id),
-                            `Start queued · ${server.address}`,
-                          )
-                        }
-                      >
-                        Start
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() =>
-                          void runAction(
-                            () => window.aetherion!.sandbox.stop(server.id),
-                            `Stop queued · ${server.address}`,
-                          )
-                        }
-                      >
-                        <Square className="size-3.5" />
-                        Stop
-                      </Button>
-                      <Button type="button" size="sm" disabled={busy} onClick={() => void play(server)}>
-                        <Play className="size-3.5 fill-primary-foreground" />
-                        Play
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        disabled={busy}
-                        className="text-destructive hover:text-destructive"
-                        onClick={() =>
-                          void runAction(
-                            () => window.aetherion!.sandbox.remove(server.id),
-                            `${server.name} deleted.`,
-                          )
-                        }
-                      >
-                        <Trash2 className="size-3.5" />
-                        Delete
-                      </Button>
-                    </div>
+                    <ServerActions
+                      busy={busy}
+                      onStart={() =>
+                        void runAction(
+                          () => window.aetherion!.sandbox.start(server.id),
+                          `Start queued · ${server.address}`,
+                        )
+                      }
+                      onStop={() =>
+                        void runAction(
+                          () => window.aetherion!.sandbox.stop(server.id),
+                          `Stop queued · ${server.address}`,
+                        )
+                      }
+                      onPlay={() => void play(server)}
+                      onDelete={() =>
+                        void runAction(
+                          () => window.aetherion!.sandbox.remove(server.id),
+                          `${server.name} deleted.`,
+                        )
+                      }
+                    />
                   </div>
                 ))}
               </div>
             )}
           </section>
+          </>
+          )}
         </div>
       </div>
 
@@ -455,6 +435,8 @@ function SandboxDetail({
   server,
   live,
   busy,
+  error,
+  notice,
   onBack,
   onStart,
   onStop,
@@ -465,6 +447,8 @@ function SandboxDetail({
   server: SandboxServer
   live: SandboxLiveStatus | null
   busy: boolean
+  error: string | null
+  notice: string | null
   onBack: () => void
   onStart: () => void
   onStop: () => void
@@ -474,25 +458,57 @@ function SandboxDetail({
 }) {
   const status =
     live?.state === "online" ? "Online" : live?.state === "offline" ? "Offline" : "Unknown"
+  const dot =
+    live?.state === "online"
+      ? "bg-primary text-primary"
+      : live?.state === "offline"
+        ? "bg-destructive text-destructive"
+        : "bg-muted-foreground text-muted-foreground"
   const players = live?.players ? `${live.players.current} / ${live.players.max}` : "—"
   return (
-    <div className="mt-3 rounded-2xl border border-white/10 bg-background/55 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <button type="button" onClick={onBack} className="text-xs uppercase tracking-[0.16em] text-muted-foreground hover:text-primary">
-            Back to servers
-          </button>
-          <h2 className="mt-2 font-serif text-2xl tracking-[0.08em] text-foreground">{server.name}</h2>
-          <p className="mt-1 font-mono text-sm text-primary">{server.address}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Status</p>
-          <p className="mt-1 text-sm text-foreground">{status}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Players {players}</p>
+    <div className="aetherion-glass aetherion-rise rounded-2xl p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 px-3 text-sm text-muted-foreground transition hover:bg-white/5 hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" />
+          Servers
+        </button>
+        <div className="flex items-center gap-2">
+          <span className={cn("size-1.5 rounded-full aetherion-live", dot)} />
+          <span className="text-sm font-medium tracking-wide text-foreground">{status}</span>
         </div>
       </div>
 
-      <dl className="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+      <p className="aetherion-kicker mt-5 text-primary/85!">Sandbox</p>
+      <h2 className="mt-2 font-serif text-3xl tracking-[0.12em] text-foreground">{server.name}</h2>
+      <p className="mt-2 font-mono text-sm text-primary">{server.address}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{serverMeta(server)}</p>
+
+      {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+      {notice && <p className="mt-4 text-sm text-primary">{notice}</p>}
+
+      <div className="mt-5">
+        <ServerActions
+          busy={busy}
+          onStart={onStart}
+          onStop={onStop}
+          onRestart={onRestart}
+          onPlay={onPlay}
+          onDelete={onDelete}
+        />
+      </div>
+
+      <div className="mt-6 grid grid-cols-3 gap-4 border-t border-white/10 pt-5">
+        <Metric label="Players" value={players} dot={dot} />
+        <Metric label="Ping" value={live?.ping != null ? `${live.ping} ms` : "—"} dot="bg-magic text-magic" />
+        <Metric label="MOTD" value={server.motd || live?.motd || "—"} dot="bg-primary/70 text-primary" />
+      </div>
+
+      <p className="aetherion-kicker mt-6">World</p>
+      <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Fact label="Engine" value={server.serverType} />
         <Fact label="Version" value={server.version} />
         <Fact label="RAM" value={server.ramGb ? `${server.ramGb} GB` : "—"} />
@@ -503,35 +519,71 @@ function SandboxDetail({
         <Fact label="Difficulty" value={server.difficulty || "—"} />
         <Fact label="Gamemode" value={server.gamemode || "—"} />
         <Fact label="Online mode" value={server.onlineMode == null ? "—" : server.onlineMode ? "On" : "Off"} />
-        <Fact label="Ping" value={live?.ping != null ? `${live.ping} ms` : "—"} />
-        <Fact label="MOTD" value={server.motd || live?.motd || "—"} />
       </dl>
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onStart}>
-          Start
-        </Button>
-        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onStop}>
-          <Square className="size-3.5" />
-          Stop
-        </Button>
+      <p className="mt-4 text-xs text-muted-foreground">
+        Plugins and the console are not on the friend-key API. Start, stop, restart, and delete are. World values are the ones stored when this server was created.
+      </p>
+    </div>
+  )
+}
+
+function ServerActions({
+  busy,
+  onStart,
+  onStop,
+  onRestart,
+  onPlay,
+  onDelete,
+}: {
+  busy: boolean
+  onStart: () => void
+  onStop: () => void
+  onRestart?: () => void
+  onPlay: () => void
+  onDelete: () => void
+}) {
+  return (
+    <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
+      <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onStart}>
+        Start
+      </Button>
+      <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onStop}>
+        <Square className="size-3.5" />
+        Stop
+      </Button>
+      {onRestart ? (
         <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onRestart}>
           <RotateCcw className="size-3.5" />
           Restart
         </Button>
-        <Button type="button" size="sm" disabled={busy} onClick={onPlay}>
-          <Play className="size-3.5 fill-primary-foreground" />
-          Play
-        </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={busy} className="text-destructive hover:text-destructive" onClick={onDelete}>
-          <Trash2 className="size-3.5" />
-          Delete
-        </Button>
-      </div>
+      ) : null}
+      <Button type="button" size="sm" disabled={busy} onClick={onPlay}>
+        <Play className="size-3.5 fill-primary-foreground" />
+        Play
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        disabled={busy}
+        className="text-destructive hover:text-destructive"
+        onClick={onDelete}
+      >
+        <Trash2 className="size-3.5" />
+        Delete
+      </Button>
+    </div>
+  )
+}
 
-      <div className="mt-5 space-y-2 text-sm text-muted-foreground">
-        <p>Plugins and the console are not on the friend-key API. It can start, stop, restart, and delete this sandbox, and it accepts text uploads only — not plugin jars.</p>
-        <p>Engine, version, RAM, and the world settings above are the values stored when this server was created. The control API has no route to change them afterward.</p>
+function Metric({ label, value, dot }: { label: string; value: string; dot: string }) {
+  return (
+    <div>
+      <p className="aetherion-kicker">{label}</p>
+      <div className="mt-1.5 flex items-center gap-2">
+        <span className={cn("size-1.5 shrink-0 rounded-full aetherion-live", dot)} />
+        <span className="truncate text-sm font-medium tracking-wide text-foreground">{value}</span>
       </div>
     </div>
   )
@@ -539,11 +591,17 @@ function SandboxDetail({
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/8 bg-white/3 px-3 py-2">
-      <dt className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</dt>
-      <dd className="mt-1 truncate text-foreground">{value}</dd>
+    <div className="rounded-xl border border-white/10 bg-white/3 px-3 py-3">
+      <dt className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</dt>
+      <dd className="mt-1 truncate text-sm font-medium text-foreground">{value}</dd>
     </div>
   )
+}
+
+function serverMeta(server: SandboxServer) {
+  const ram = server.ramGb ? `${server.ramGb}G` : "—"
+  const cpu = server.cpuCores ? `${server.cpuCores}C` : "—"
+  return `${server.serverType} ${server.version} · ${ram} · ${cpu}`
 }
 
 function Chip({
