@@ -29,8 +29,13 @@ export function ModsTab() {
   )
   const [dropins, setDropins] = useState<DropinMod[]>(MOCK_DROPIN_MODS)
   const [status, setStatus] = useState("Local drop-ins are ready.")
+  const [minecraftVersion, setMinecraftVersion] = useState("1.21.1")
 
   useEffect(() => {
+    window.aetherion?.settings
+      ?.get()
+      .then((settings) => setMinecraftVersion(settings.minecraft.version || "1.21.1"))
+      .catch(() => undefined)
     reloadDropins()
     window.aetherion?.mods
       ?.listPack?.()
@@ -133,7 +138,11 @@ export function ModsTab() {
     <>
       <SettingsSection
         title={`Aetherion mods (${packMods.length})`}
-        description="Installed in the normal mods folder for Minecraft 1.21.1. Turn any of them off. Other versions do not get this pack."
+        description={
+          minecraftVersion === "1.21.1"
+            ? "Installed in the normal mods folder for Minecraft 1.21.1. Turn any of them off. Other versions stay vanilla."
+            : `Minecraft ${minecraftVersion} does not use these mods. They stay on the 1.21.1 instance only.`
+        }
       >
         <div className="rounded-lg border border-border/50 divide-y divide-border/40">
           {packMods.map((mod) => (

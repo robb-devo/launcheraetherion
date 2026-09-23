@@ -34,6 +34,11 @@ foreach ($required in @($InstallerPath, $blockmap, $latestYml)) {
   }
 }
 
+node (Join-Path (Get-Location) "scripts/validate-latest-yml.mjs") $latestYml $Version
+if ($LASTEXITCODE -ne 0) {
+  throw "latest.yml does not match $Version. electron-updater will ignore this release."
+}
+
 $headers = @{
   Authorization = "Bearer $env:GITHUB_TOKEN"
   Accept = "application/vnd.github+json"

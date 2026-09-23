@@ -1,6 +1,6 @@
 const net = require("node:net")
 
-const STATUS_PROTOCOL = 767
+const STATUS_PROTOCOL = -1
 
 function writeVarInt(value) {
   const bytes = []
@@ -50,12 +50,58 @@ function readVarInt(buffer, cursor) {
 }
 
 function stripMotd(value) {
-  if (typeof value === "string") return value.replace(/§./g, "").trim()
-  if (value && Array.isArray(value.extra)) {
-    return value.extra.map((part) => stripMotd(part)).join("").trim()
+  return stripMotdParts(value).replace(/§./g, "").replace(/[ \t]+\n/g, "\n").trim()
+}
+
+function stripMotdParts(value) {
+  if (typeof value === "string") return value.replace(/§./g, "")
+  if (!value || typeof value !== "object") return ""
+  const text = typeof value.text === "string" ? value.text.replace(/§./g, "") : ""
+  const extra = Array.isArray(value.extra) ? value.extra.map((part) => stripMotdParts(part)).join("") : ""
+  return `${text}${extra}`
+}
+
+function playersFromStatus(json) {
+  const players = json?.players
+  if (!players || typeof players !== "object") return null
+  const max = Number(players.max)
+  const reported = Number(players.online)
+  if (!Number.isFinite(reported) || !Number.isFinite(max)) return null
+  const sample = Array.isArray(players.sample) ? players.sample.length : 0
+  const current = reported === 0 && sample > 0 ? sample : reported
+  return { current, max }
+}
+
+function statusFromJson(json) {
+  return {
+    state: "online",
+    players: playersFromStatus(json),
+    motd: stripMotd(json?.description) || null,
+    versionName: typeof json?.version?.name === "string" ? json.version.name : null,
   }
-  if (value && typeof value.text === "string") return stripMotd(value.text)
-  return ""
+}
+
+function encodeStatusResponse(json) {
+  const body = Buffer.from(JSON.stringify(json), "utf8")
+  const payload = Buffer.concat([writeVarInt(0), writeVarInt(body.length), body])
+  return Buffer.concat([writeVarInt(payload.length), payload])
+}
+
+function decodeStatusResponse(buffer) {
+  const cursor = { offset: 0 }
+  const length = readVarInt(buffer, cursor)
+  if (length == null || buffer.length < cursor.offset + length) return { complete: false }
+  const packetId = readVarInt(buffer, cursor)
+  if (packetId == null) return { complete: false }
+  if (packetId !== 0) return { complete: true, state: "unknown", players: null, motd: null }
+  const jsonLength = readVarInt(buffer, cursor)
+  if (jsonLength == null || buffer.length < cursor.offset + jsonLength) return { complete: false }
+  try {
+    const json = JSON.parse(buffer.subarray(cursor.offset, cursor.offset + jsonLength).toString("utf8"))
+    return { complete: true, ...statusFromJson(json) }
+  } catch {
+    return { complete: true, state: "unknown", players: null, motd: null }
+  }
 }
 
 function pingMinecraft(host, port, timeoutMs = 4000) {
@@ -90,31 +136,20 @@ function pingMinecraft(host, port, timeoutMs = 4000) {
 
     socket.on("data", (chunk) => {
       chunks.push(chunk)
-      try {
-        const buffer = Buffer.concat(chunks)
-        const cursor = { offset: 0 }
-        const length = readVarInt(buffer, cursor)
-        if (length == null || buffer.length < cursor.offset + length) return
-        const packetId = readVarInt(buffer, cursor)
-        if (packetId !== 0) return
-        const jsonLength = readVarInt(buffer, cursor)
-        if (jsonLength == null || buffer.length < cursor.offset + jsonLength) return
-        const json = JSON.parse(buffer.subarray(cursor.offset, cursor.offset + jsonLength).toString("utf8"))
-        clearTimeout(timer)
-        const players = json.players || {}
-        finish({
-          state: "online",
-          players:
-            Number.isFinite(players.online) && Number.isFinite(players.max)
-              ? { current: players.online, max: players.max }
-              : null,
-          motd: stripMotd(json.description) || null,
-          ping: Date.now() - started,
-        })
-      } catch {
-        clearTimeout(timer)
+      const decoded = decodeStatusResponse(Buffer.concat(chunks))
+      if (!decoded.complete) return
+      clearTimeout(timer)
+      if (decoded.state !== "online") {
         finish({ state: "unknown" })
+        return
       }
+      finish({
+        state: "online",
+        players: decoded.players,
+        motd: decoded.motd,
+        versionName: decoded.versionName,
+        ping: Date.now() - started,
+      })
     })
   })
 }
@@ -132,4 +167,10 @@ async function probeRealm(host, port = 25565) {
   }
 }
 
-module.exports = { probeRealm, pingMinecraft }
+module.exports = {
+  probeRealm,
+  pingMinecraft,
+  playersFromStatus,
+  decodeStatusResponse,
+  encodeStatusResponse,
+}

@@ -1,6 +1,6 @@
 {
   "name": "aetherion-launcher",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "Aetherion Minecraft launcher",
   "private": true,
   "productName": "Aetherion Launcher",
@@ -60,10 +60,12 @@
       "node_modules/ms/**/*",
       "node_modules/sax/**/*"
     ],
+    "generateUpdatesFilesForAllChannels": true,
     "publish": {
       "provider": "github",
       "owner": "robb-devo",
-      "repo": "launcheraetherion"
+      "repo": "launcheraetherion",
+      "releaseType": "release"
     },
     "asar": true,
     "win": {

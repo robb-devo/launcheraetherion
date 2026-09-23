@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Play, Square, Trash2 } from "lucide-react"
+import { ArrowLeft, Play, RotateCcw, Square, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -12,6 +12,7 @@ import {
   SANDBOX_TYPES,
   type SandboxCreateInput,
   type SandboxOptions,
+  type SandboxLiveStatus,
   type SandboxServer,
   type SandboxType,
 } from "@/lib/launcher/sandbox"
@@ -38,6 +39,9 @@ export function SandboxFactory() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [inspected, setInspected] = useState<SandboxServer | null>(null)
+  const [live, setLive] = useState<SandboxLiveStatus | null>(null)
   const [progress, setProgress] = useState<LaunchProgress | null>(null)
 
   const versions = options.versions?.[serverType] ?? []
@@ -68,6 +72,29 @@ export function SandboxFactory() {
       .catch(() => undefined)
     void refresh().catch((err) => setError(readableError(err, "Could not load servers.")))
   }, [])
+
+  useEffect(() => {
+    if (!selectedId || !window.aetherion?.sandbox?.inspect) return
+    let stopped = false
+    const load = () => {
+      window.aetherion?.sandbox
+        .inspect(selectedId)
+        .then((result) => {
+          if (stopped) return
+          setInspected(result.server)
+          setLive(result.live)
+        })
+        .catch((err) => {
+          if (!stopped) setError(readableError(err, "Could not open that server."))
+        })
+    }
+    load()
+    const timer = window.setInterval(load, 15000)
+    return () => {
+      stopped = true
+      window.clearInterval(timer)
+    }
+  }, [selectedId])
 
   async function refresh() {
     if (!window.aetherion?.sandbox) return
@@ -188,6 +215,13 @@ export function SandboxFactory() {
     }
   }
 
+  const listed = servers.find((server) => server.id === selectedId) || null
+  const selected = (
+    selectedId && (inspected?.id === selectedId || listed)
+      ? { ...(listed || {}), ...(inspected?.id === selectedId ? inspected : {}) }
+      : null
+  ) as SandboxServer | null
+
   return (
     <div className="relative h-full overflow-hidden bg-background">
       <div className="absolute inset-0 bg-[url('/aetherion-bg.jpg')] bg-cover bg-[center_42%] opacity-40" />
@@ -295,23 +329,56 @@ export function SandboxFactory() {
 
           <section>
             <p className="aetherion-kicker">Your servers</p>
-            {servers.length === 0 ? (
+            {selected ? (
+              <SandboxDetail
+                server={selected}
+                live={live}
+                busy={busy}
+                onBack={() => {
+                  setSelectedId(null)
+                  setInspected(null)
+                  setLive(null)
+                }}
+                onStart={() =>
+                  void runAction(() => window.aetherion!.sandbox.start(selected.id), `Start queued · ${selected.address}`)
+                }
+                onStop={() =>
+                  void runAction(() => window.aetherion!.sandbox.stop(selected.id), `Stop queued · ${selected.address}`)
+                }
+                onRestart={() =>
+                  void runAction(
+                    () => window.aetherion!.sandbox.restart(selected.id),
+                    `Restart queued · ${selected.address}`,
+                  )
+                }
+                onDelete={() =>
+                  void runAction(async () => {
+                    const result = await window.aetherion!.sandbox.remove(selected.id)
+                    setSelectedId(null)
+                    setInspected(null)
+                    return result
+                  }, `${selected.name} deleted.`)
+                }
+                onPlay={() => void play(selected)}
+              />
+            ) : servers.length === 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">No servers yet for this Microsoft account.</p>
             ) : (
               <div className="mt-3 space-y-3">
                 {servers.map((server) => (
-                  <article
+                  <div
                     key={server.id}
-                    className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-background/55 px-4 py-4"
+                    onClick={() => setSelectedId(server.id)}
+                    className="flex cursor-pointer flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-background/55 px-4 py-4 transition hover:border-primary/40"
                   >
-                    <div>
+                    <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedId(server.id)}>
                       <p className="font-medium text-foreground">{server.name}</p>
                       <p className="mt-1 font-mono text-sm text-primary">{server.address}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {server.serverType} {server.version} · {server.ramGb}G / {server.cpuCores}C
+                        {server.serverType} {server.version} · {server.ramGb}G / {server.cpuCores}C · Open
                       </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
+                    </button>
+                    <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
                       <Button
                         type="button"
                         size="sm"
@@ -362,7 +429,7 @@ export function SandboxFactory() {
                         Delete
                       </Button>
                     </div>
-                  </article>
+                  </div>
                 ))}
               </div>
             )}
@@ -380,6 +447,101 @@ export function SandboxFactory() {
           onDismiss={() => setProgress(null)}
         />
       )}
+    </div>
+  )
+}
+
+function SandboxDetail({
+  server,
+  live,
+  busy,
+  onBack,
+  onStart,
+  onStop,
+  onRestart,
+  onDelete,
+  onPlay,
+}: {
+  server: SandboxServer
+  live: SandboxLiveStatus | null
+  busy: boolean
+  onBack: () => void
+  onStart: () => void
+  onStop: () => void
+  onRestart: () => void
+  onDelete: () => void
+  onPlay: () => void
+}) {
+  const status =
+    live?.state === "online" ? "Online" : live?.state === "offline" ? "Offline" : "Unknown"
+  const players = live?.players ? `${live.players.current} / ${live.players.max}` : "—"
+  return (
+    <div className="mt-3 rounded-2xl border border-white/10 bg-background/55 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <button type="button" onClick={onBack} className="text-xs uppercase tracking-[0.16em] text-muted-foreground hover:text-primary">
+            Back to servers
+          </button>
+          <h2 className="mt-2 font-serif text-2xl tracking-[0.08em] text-foreground">{server.name}</h2>
+          <p className="mt-1 font-mono text-sm text-primary">{server.address}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Status</p>
+          <p className="mt-1 text-sm text-foreground">{status}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Players {players}</p>
+        </div>
+      </div>
+
+      <dl className="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+        <Fact label="Engine" value={server.serverType} />
+        <Fact label="Version" value={server.version} />
+        <Fact label="RAM" value={server.ramGb ? `${server.ramGb} GB` : "—"} />
+        <Fact label="CPU" value={server.cpuCores ? `${server.cpuCores}` : "—"} />
+        <Fact label="Max players" value={server.maxPlayers != null ? String(server.maxPlayers) : "—"} />
+        <Fact label="View" value={server.viewDistance != null ? String(server.viewDistance) : "—"} />
+        <Fact label="Simulation" value={server.simulationDistance != null ? String(server.simulationDistance) : "—"} />
+        <Fact label="Difficulty" value={server.difficulty || "—"} />
+        <Fact label="Gamemode" value={server.gamemode || "—"} />
+        <Fact label="Online mode" value={server.onlineMode == null ? "—" : server.onlineMode ? "On" : "Off"} />
+        <Fact label="Ping" value={live?.ping != null ? `${live.ping} ms` : "—"} />
+        <Fact label="MOTD" value={server.motd || live?.motd || "—"} />
+      </dl>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onStart}>
+          Start
+        </Button>
+        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onStop}>
+          <Square className="size-3.5" />
+          Stop
+        </Button>
+        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onRestart}>
+          <RotateCcw className="size-3.5" />
+          Restart
+        </Button>
+        <Button type="button" size="sm" disabled={busy} onClick={onPlay}>
+          <Play className="size-3.5 fill-primary-foreground" />
+          Play
+        </Button>
+        <Button type="button" size="sm" variant="ghost" disabled={busy} className="text-destructive hover:text-destructive" onClick={onDelete}>
+          <Trash2 className="size-3.5" />
+          Delete
+        </Button>
+      </div>
+
+      <div className="mt-5 space-y-2 text-sm text-muted-foreground">
+        <p>Plugins and the console are not on the friend-key API. It can start, stop, restart, and delete this sandbox, and it accepts text uploads only — not plugin jars.</p>
+        <p>Engine, version, RAM, and the world settings above are the values stored when this server was created. The control API has no route to change them afterward.</p>
+      </div>
+    </div>
+  )
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/8 bg-white/3 px-3 py-2">
+      <dt className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</dt>
+      <dd className="mt-1 truncate text-foreground">{value}</dd>
     </div>
   )
 }

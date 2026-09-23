@@ -166,7 +166,7 @@ export function LauncherTab() {
 
       <SettingsSection
         title="Updates"
-        description="Install this version once. Later versions come from GitHub Releases inside this app."
+        description="An installed build checks GitHub Releases. A newer release appears here only when it includes latest.yml, the Setup.exe, and the blockmap."
       >
         <p className="text-sm text-foreground">{update.message}</p>
         <div className="flex items-center gap-2">

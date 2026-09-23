@@ -90,16 +90,28 @@ export function Dashboard() {
 
   useEffect(() => {
     if (!window.aetherion?.status) return
-    window.aetherion.status
-      .realm()
-      .then((status) =>
-        setRealm({
-          state: status.state,
-          players: status.players,
-          ping: status.ping,
-        }),
-      )
-      .catch(() => setRealm(UNKNOWN_REALM))
+    let stopped = false
+    const load = () => {
+      window.aetherion?.status
+        .realm()
+        .then((status) => {
+          if (stopped) return
+          setRealm({
+            state: status.state,
+            players: status.players,
+            ping: status.ping,
+          })
+        })
+        .catch(() => {
+          if (!stopped) setRealm(UNKNOWN_REALM)
+        })
+    }
+    load()
+    const timer = window.setInterval(load, 20000)
+    return () => {
+      stopped = true
+      window.clearInterval(timer)
+    }
   }, [])
 
   async function handleLaunch() {
@@ -342,6 +354,16 @@ export function Dashboard() {
                     />
                   </div>
                 ) : null}
+                {update && update.status !== "idle" ? (
+                  <p
+                    className={cn(
+                      "mt-2 max-w-[220px] text-right text-[11px] leading-snug",
+                      update.status === "error" ? "text-destructive" : "text-muted-foreground",
+                    )}
+                  >
+                    {update.message}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -369,7 +391,9 @@ function UpdateNotice() {
     return updater.onState(setUpdate)
   }, [])
 
-  if (!update || (update.status !== "downloading" && update.status !== "ready")) return null
+  if (!update || (update.status !== "downloading" && update.status !== "ready" && update.status !== "error" && update.status !== "checking")) {
+    return null
+  }
 
   return (
     <div className="mx-6 mb-3 flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-background/75 px-4 py-2 backdrop-blur-md">

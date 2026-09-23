@@ -5,6 +5,8 @@
  * Other Minecraft versions do not receive this pack.
  */
 
+const PACK_MINECRAFT = "1.21.1"
+
 function emptyPlan(manifestVersion, fromVersion) {
   return {
     manifestVersion: manifestVersion || null,
@@ -16,6 +18,59 @@ function emptyPlan(manifestVersion, fromVersion) {
     needsForgeInstall: false,
     applyPack: false,
   }
+}
+
+function isAetherionPackVersion(minecraftVersion, packVersion = PACK_MINECRAFT) {
+  return String(minecraftVersion || "") === PACK_MINECRAFT && String(packVersion || "") === PACK_MINECRAFT
+}
+
+function planForMinecraftVersion({
+  minecraftVersion,
+  packVersion = PACK_MINECRAFT,
+  files,
+  local,
+  installedHashes,
+  manifestVersion,
+  fromVersion,
+  protectedPatterns,
+  isProtected,
+}) {
+  if (!isAetherionPackVersion(minecraftVersion, packVersion)) {
+    return emptyPlan(manifestVersion, fromVersion)
+  }
+  const managed = planManagedFiles(files, local, installedHashes)
+  const actions = [...managed.actions]
+  const dropinSet = new Set((local?.dropinMods || []).map((mod) => `mods/${mod.filename}`))
+  const guard = typeof isProtected === "function" ? isProtected : () => false
+  for (const filePath of Object.keys(installedHashes || {})) {
+    if (isKeptInstalledFile(filePath, managed.validPaths, protectedPatterns, dropinSet, guard)) continue
+    actions.push({ kind: "remove", path: filePath, reason: "orphan" })
+  }
+  const downloads = actions.filter((action) => action.kind === "download")
+  return {
+    manifestVersion: manifestVersion || null,
+    fromVersion: fromVersion || null,
+    actions,
+    totalBytes: downloads.reduce((total, action) => total + (action.size || 0), 0),
+    downloadCount: downloads.length,
+    removeCount: actions.filter((action) => action.kind === "remove").length,
+    needsForgeInstall: false,
+    applyPack: true,
+  }
+}
+
+function packInstalledRelPaths(files) {
+  const paths = []
+  for (const file of files || []) {
+    const filePath = String(file?.path || "").replace(/\\/g, "/")
+    if (!filePath || filePath.includes("..")) continue
+    const managed =
+      filePath.startsWith("mods/") || filePath.startsWith("shaderpacks/") || filePath.startsWith("config/")
+    if (!managed || filePath.startsWith("mods/dropin/")) continue
+    paths.push(filePath)
+    if (filePath.endsWith(".jar") || filePath.endsWith(".zip")) paths.push(`${filePath}.disabled`)
+  }
+  return paths
 }
 
 function planManagedFiles(files, local, installedHashes) {
@@ -88,7 +143,11 @@ function isKeptInstalledFile(filePath, validPaths, protectedPatterns, dropinSet,
 }
 
 module.exports = {
+  PACK_MINECRAFT,
   emptyPlan,
+  isAetherionPackVersion,
+  planForMinecraftVersion,
+  packInstalledRelPaths,
   planManagedFiles,
   isKeptInstalledFile,
 }

@@ -41,9 +41,23 @@ export interface SandboxServer {
   cpuCores: number
   preset?: SandboxPreset
   maxPlayers?: number
+  viewDistance?: number
+  simulationDistance?: number
+  difficulty?: string
+  gamemode?: string
+  motd?: string
+  port?: number
+  createdAt?: string
   address: string
   onlineMode?: boolean
   running?: boolean | null
+}
+
+export interface SandboxLiveStatus {
+  state: "online" | "offline" | "unknown"
+  players: { current: number; max: number } | null
+  ping: number | null
+  motd?: string | null
 }
 
 export interface SandboxCreateInput {

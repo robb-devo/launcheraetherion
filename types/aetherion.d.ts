@@ -104,6 +104,11 @@ declare global {
         start: (id: string) => Promise<{ ok?: boolean; address?: string; running?: boolean | null }>
         stop: (id: string) => Promise<{ ok?: boolean; address?: string; running?: boolean | null }>
         remove: (id: string) => Promise<{ ok?: boolean; id?: string }>
+        restart: (id: string) => Promise<{ ok?: boolean; address?: string; running?: boolean | null }>
+        inspect: (id: string) => Promise<{
+          server: import("@/lib/launcher/sandbox").SandboxServer
+          live: import("@/lib/launcher/sandbox").SandboxLiveStatus
+        }>
       }
       launcher: {
         openDataDirectory: () => Promise<{ ok: boolean }>

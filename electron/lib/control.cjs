@@ -102,6 +102,11 @@ function sandboxDelete(playerId, id) {
   return api(`/sandbox/servers/${encodeURIComponent(id)}`, { method: "DELETE", playerId })
 }
 
+async function sandboxRestart(playerId, id) {
+  await sandboxStop(playerId, id)
+  return sandboxStart(playerId, id)
+}
+
 module.exports = {
   DEFAULT_API_BASE,
   BAKED_SERVICE_KEY,
@@ -117,4 +122,5 @@ module.exports = {
   sandboxStart,
   sandboxStop,
   sandboxDelete,
+  sandboxRestart,
 }

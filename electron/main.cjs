@@ -17,7 +17,7 @@ const {
   loggingConfigArtifact,
 } = require("./lib/runtime-plan.cjs")
 const { resolveLaunchTarget, sanitizeVersion, versionChoices } = require("./lib/launch-target.cjs")
-const { emptyPlan, planManagedFiles, isKeptInstalledFile } = require("./lib/managed-mods.cjs")
+const { planForMinecraftVersion, packInstalledRelPaths } = require("./lib/managed-mods.cjs")
 const { spawn } = require("node:child_process")
 const crypto = require("node:crypto")
 const fsSync = require("node:fs")
@@ -339,6 +339,19 @@ ipcMain.handle("sandbox:stop", async (_event, id) =>
 ipcMain.handle("sandbox:remove", async (_event, id) =>
   controlApi.sandboxDelete(await microsoftPlayerId(), id),
 )
+ipcMain.handle("sandbox:restart", async (_event, id) => {
+  const playerId = await microsoftPlayerId()
+  await controlApi.sandboxStop(playerId, id)
+  return controlApi.sandboxStart(playerId, id)
+})
+ipcMain.handle("sandbox:inspect", async (_event, id) => {
+  const { servers } = await controlApi.sandboxList(await microsoftPlayerId())
+  const server = (servers || []).find((item) => item && item.id === id)
+  if (!server) throw new Error("Sandbox not found.")
+  const address = splitHostPort(server.address)
+  const live = address ? await probeRealm(address.host, address.port) : { state: "unknown", players: null, ping: null }
+  return { server, live }
+})
 
 ipcMain.handle("settings:get", () => readLauncherSettings())
 ipcMain.handle("settings:update", async (_event, patch) => {
@@ -890,17 +903,20 @@ async function runUpdater(args, signal) {
 
   let [localState, installedHashes] = await Promise.all([
     readInstanceState(root, manifest, instanceId),
-    scanInstalledHashes(root),
+    target.usePack ? scanInstalledHashes(root) : Promise.resolve({}),
   ])
-  localState = {
-    ...localState,
-    dropinMods: await scanDropinMods(root, localState.dropinMods),
+  if (target.usePack) {
+    localState = {
+      ...localState,
+      dropinMods: await scanDropinMods(root, localState.dropinMods),
+    }
   }
   throwIfAborted(signal)
 
-  const plan = target.usePack
-    ? computeUpdatePlan(manifest, localState, installedHashes)
-    : emptyPlan(manifest.version, localState.installedManifestVersion)
+  const plan = computeUpdatePlan(manifest, localState, installedHashes, target.version)
+  if (!plan.applyPack) {
+    await removeInheritedPackFiles(root, manifest)
+  }
 
   if (plan.downloadCount === 0 && plan.removeCount === 0) {
     emitLaunchProgress({
@@ -925,11 +941,11 @@ async function runUpdater(args, signal) {
 
   const nextState = {
     instanceId: target.usePack ? instanceId : `mc-${target.version}`,
-    installedManifestVersion: manifest.version,
-    enabledOptionalMods: localState.enabledOptionalMods || {},
-    dropinMods: localState.dropinMods || [],
+    installedManifestVersion: target.usePack ? manifest.version : null,
+    enabledOptionalMods: target.usePack ? localState.enabledOptionalMods || {} : {},
+    dropinMods: target.usePack ? localState.dropinMods || [] : [],
     lastCheckedAt: new Date().toISOString(),
-    installedForgeSha,
+    installedForgeSha: target.usePack ? installedForgeSha : null,
   }
   await writeInstanceState(root, nextState)
 
@@ -995,7 +1011,7 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
     message: "Building the Minecraft launch plan...",
   })
 
-  const usePack = args?.usePack !== false && (args?.minecraftVersion || manifest.minecraft) === manifest.minecraft
+  const usePack = args?.usePack === true && args?.minecraftVersion === manifest.minecraft && manifest.minecraft === "1.21.1"
   const versionId = usePack ? manifest.minecraft : args?.minecraftVersion || manifest.minecraft
   const realm = packServer(manifest)
   let profileId
@@ -2321,32 +2337,35 @@ async function scanDropinMods(root, knownMods = []) {
   return [...byFilename.values()].sort((a, b) => a.filename.localeCompare(b.filename))
 }
 
-function computeUpdatePlan(manifest, local, installedHashes) {
-  const needsForgeInstall = false
-  const managed = planManagedFiles(manifest.files, local, installedHashes)
-  const actions = [...managed.actions]
-  const validPaths = managed.validPaths
-
-  const protectedPatterns = manifest.protectedPatterns || []
-  const dropinSet = new Set((local.dropinMods || []).map((mod) => `mods/${mod.filename}`))
-  for (const filePath of Object.keys(installedHashes)) {
-    if (isKeptInstalledFile(filePath, validPaths, protectedPatterns, dropinSet, isProtected)) continue
-    actions.push({ kind: "remove", path: filePath, reason: "orphan" })
-  }
-
-  const downloads = actions.filter((action) => action.kind === "download")
-  return {
+function computeUpdatePlan(manifest, local, installedHashes, minecraftVersion) {
+  return planForMinecraftVersion({
+    minecraftVersion: minecraftVersion || manifest.minecraft,
+    packVersion: manifest.minecraft,
+    files: manifest.files,
+    local,
+    installedHashes,
     manifestVersion: manifest.version,
-    fromVersion: local.installedManifestVersion,
-    actions,
-    totalBytes: downloads.reduce((total, action) => total + (action.size || 0), 0),
-    downloadCount: downloads.length,
-    removeCount: actions.filter((action) => action.kind === "remove").length,
-    needsForgeInstall,
+    fromVersion: local?.installedManifestVersion,
+    protectedPatterns: manifest.protectedPatterns || [],
+    isProtected,
+  })
+}
+
+async function removeInheritedPackFiles(root, manifest) {
+  for (const relative of packInstalledRelPaths(manifest?.files)) {
+    const absolute = safeResolve(root, relative)
+    if (!fsSync.existsSync(absolute)) continue
+    await fs.rm(absolute, { force: true })
   }
 }
 
 async function executeUpdatePlan(root, plan, signal) {
+  if (plan?.applyPack !== true) {
+    const blocked = (plan?.actions || []).filter((action) => action.kind === "download" || action.kind === "enable")
+    if (blocked.length > 0) {
+      throw new Error("Refusing to install Aetherion files outside Minecraft 1.21.1.")
+    }
+  }
   for (const action of plan.actions) {
     if (action.kind === "disable") {
       await moveInstanceFile(root, action.path, `${action.path}.disabled`)
@@ -3008,6 +3027,16 @@ function launchTargetFromSettings(settings, requestedVersion) {
     packInstanceId: instanceId,
     gameDirectory: settings?.minecraft?.gameDirectory || instancePath(instanceId),
   })
+}
+
+function splitHostPort(address) {
+  const value = String(address || "").trim()
+  const index = value.lastIndexOf(":")
+  if (index <= 0) return null
+  const host = value.slice(0, index).replace(/^\[|\]$/g, "")
+  const port = Number(value.slice(index + 1))
+  if (!host || !Number.isInteger(port) || port < 1 || port > 65535) return null
+  return { host, port }
 }
 
 function safeResolve(root, relativePath) {

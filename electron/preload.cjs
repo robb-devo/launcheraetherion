@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld("aetherion", {
     start: (id) => ipcRenderer.invoke("sandbox:start", id),
     stop: (id) => ipcRenderer.invoke("sandbox:stop", id),
     remove: (id) => ipcRenderer.invoke("sandbox:remove", id),
+    restart: (id) => ipcRenderer.invoke("sandbox:restart", id),
+    inspect: (id) => ipcRenderer.invoke("sandbox:inspect", id),
   },
   accounts: {
     list: () => ipcRenderer.invoke("accounts:list"),
