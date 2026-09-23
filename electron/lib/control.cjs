@@ -3,7 +3,7 @@
  * The credential stays in the main process. The window never sees it.
  */
 
-const { presentPlaytime, PLAYTIME_UNAVAILABLE } = require("./playtime.cjs")
+const { presentPlaytime } = require("./playtime.cjs")
 
 const DEFAULT_API_BASE = "http://135.181.18.162:5055"
 const BAKED_SERVICE_KEY = "aetherion-launcher-friend-v1"
@@ -110,16 +110,14 @@ async function sandboxRestart(playerId, id) {
 }
 
 /**
- * GET /api/player/playtime → { totalSeconds }.
- * A missing route or a body without totalSeconds stays empty. Never invent a duration.
+ * No playtime HTTP route exists yet, so this does not call Control.
+ * The server total is AetherServices.playtime().seconds(uuid).
+ * When a later API body includes that integer as totalSeconds, return
+ * presentPlaytime(body) and the home row appears. Until then the window
+ * omits playtime. Never invent a duration.
  */
-async function playerPlaytime(playerId) {
-  try {
-    const data = await api("/player/playtime", { playerId })
-    return presentPlaytime(data)
-  } catch {
-    return { ...PLAYTIME_UNAVAILABLE }
-  }
+async function playerPlaytime(_playerId) {
+  return presentPlaytime(null)
 }
 
 /**

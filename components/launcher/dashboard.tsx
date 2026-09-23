@@ -106,24 +106,15 @@ export function Dashboard() {
     const playtime = window.aetherion?.status?.playtime
     if (!playtime) return
     let stopped = false
-    const load = () => {
-      playtime()
-        .then((result) => {
-          if (stopped) return
-          setPlaytimeKnown(Boolean(result?.available))
-          setPlaytimeLabel(result?.label ?? null)
-        })
-        .catch(() => {
-          if (stopped) return
-          setPlaytimeKnown(false)
-          setPlaytimeLabel(null)
-        })
-    }
-    load()
-    const timer = window.setInterval(load, 60000)
+    playtime()
+      .then((result) => {
+        if (stopped || !result?.available || !result.label) return
+        setPlaytimeKnown(true)
+        setPlaytimeLabel(result.label)
+      })
+      .catch(() => undefined)
     return () => {
       stopped = true
-      window.clearInterval(timer)
     }
   }, [])
 
@@ -287,15 +278,12 @@ export function Dashboard() {
             <p className="mt-3 text-sm text-foreground/70">
               {PACK_LABEL}
             </p>
-            <p
-              className="mt-2 text-sm text-foreground/80"
-              title="Shown when Control answers GET /api/player/playtime with totalSeconds. Empty means the route has not reported a duration."
-            >
-              <span className="aetherion-kicker">Playtime</span>
-              <span className="ml-2 font-medium text-foreground">
-                {playtimeKnown && playtimeLabel ? playtimeLabel : "—"}
-              </span>
-            </p>
+            {playtimeKnown && playtimeLabel ? (
+              <p className="mt-2 text-sm text-foreground/80">
+                <span className="aetherion-kicker">Playtime</span>
+                <span className="ml-2 font-medium text-foreground">{playtimeLabel}</span>
+              </p>
+            ) : null}
           </div>
         </div>
 

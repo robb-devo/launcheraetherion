@@ -1,11 +1,12 @@
 /**
- * Realm playtime comes from Control:
- *   GET /api/player/playtime
+ * Playtime display for a future Control payload.
+ * There is no HTTP route yet. AetherionCore reads the total with
+ * AetherServices.playtime().seconds(uuid) (aetherion-plugins #50).
+ * When Control forwards that integer, the body should be:
  *   { "totalSeconds": 12345 }
- *
- * totalSeconds may also be nested as playtime.totalSeconds or player.totalSeconds.
- * A missing route, a missing field, or a bad value stays empty.
- * The launcher never substitutes a fake number.
+ * The same field may be nested as playtime.totalSeconds or player.totalSeconds.
+ * A missing body or a bad value stays empty. The launcher never invents a number,
+ * and the window omits the row until totalSeconds is present.
  */
 
 function readTotalSeconds(payload) {

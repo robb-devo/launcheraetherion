@@ -58,15 +58,15 @@ After #5 is merged, restart the API on the host (`sudo systemctl restart aetheri
 
 ## Playtime
 
-The launcher reads realm playtime for the signed-in Microsoft account:
+There is no playtime HTTP route. AetherionCore stores the network total and reads it with `AetherServices.playtime().seconds(uuid)` ([aetherion-plugins #50](https://github.com/robb-devo/aetherion-plugins/pull/50)). The launcher does not call Control for this and does not show a playtime row.
 
-`GET /api/player/playtime`
+When a later Control response includes that same integer, the home screen shows it and nothing else:
 
 ```json
 { "totalSeconds": 12345 }
 ```
 
-`totalSeconds` is an integer number of seconds. The same field may be nested as `playtime.totalSeconds` or `player.totalSeconds`. If the route is missing, or the field is absent, the home screen shows an em dash. It does not show zero unless Control sends `0`.
+`totalSeconds` may also arrive as `playtime.totalSeconds` or `player.totalSeconds`. A missing field stays hidden. Zero is shown only when the payload sends `0`.
 
 ## Linked modpack
 

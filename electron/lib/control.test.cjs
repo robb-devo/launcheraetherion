@@ -30,8 +30,9 @@ test("bearer defaults to the friend key and can be overridden by env", () => {
   else process.env.LAUNCHER_SERVICE_KEY = previousLauncher
 })
 
-test("playtime route is the documented player endpoint", () => {
-  assert.equal(control.apiUrl("/player/playtime"), `${control.DEFAULT_API_BASE}/api/player/playtime`)
+test("playtime stays hidden until a body includes totalSeconds", async () => {
+  const result = await control.playerPlaytime("aabbccddeeff00112233445566778899")
+  assert.deepEqual(result, { totalSeconds: null, available: false, label: null })
   assert.equal(control.sandboxPlugins().supported, false)
 })
 
