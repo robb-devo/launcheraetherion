@@ -6,6 +6,13 @@ import { useRouter } from "next/navigation"
 import { ArrowLeft, Play, RotateCcw, Square, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import {
   SANDBOX_PRESETS,
@@ -320,24 +327,19 @@ export function SandboxFactory() {
             </div>
 
             <p className="mt-5 text-xs uppercase tracking-[0.16em] text-muted-foreground">Version</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {versions.length === 0 ? (
+            {versions.length === 0 ? (
+              <>
                 <Input
                   value={version}
                   onChange={(event) => setVersion(event.target.value)}
                   placeholder="1.21.1"
-                  className="h-10 max-w-xs border-white/10 bg-white/4"
+                  aria-label="Version"
+                  className="mt-2 h-11 max-w-xs border-white/10 bg-white/4"
                 />
-              ) : (
-                versions.slice(0, 12).map((item) => (
-                  <Chip key={item} active={selectedVersion === item} onClick={() => setVersion(item)}>
-                    {item}
-                  </Chip>
-                ))
-              )}
-            </div>
-            {versions.length === 0 && (
-              <p className="mt-2 text-xs text-muted-foreground">Versions load from the control API.</p>
+                <p className="mt-2 text-xs text-muted-foreground">Versions load from the control API.</p>
+              </>
+            ) : (
+              <VersionSelect versions={versions} value={selectedVersion} onChange={setVersion} />
             )}
 
             <p className="mt-5 text-xs uppercase tracking-[0.16em] text-muted-foreground">RAM / CPU</p>
@@ -602,6 +604,43 @@ function serverMeta(server: SandboxServer) {
   const ram = server.ramGb ? `${server.ramGb}G` : "—"
   const cpu = server.cpuCores ? `${server.cpuCores}C` : "—"
   return `${server.serverType} ${server.version} · ${ram} · ${cpu}`
+}
+
+function VersionSelect({
+  versions,
+  value,
+  onChange,
+}: {
+  versions: string[]
+  value: string
+  onChange: (version: string) => void
+}) {
+  return (
+    <div className="mt-2 max-w-xs">
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger
+          aria-label="Version"
+          className="h-11 w-full rounded-lg border-white/10 bg-white/4 px-3 text-sm text-foreground shadow-none hover:border-primary/40 focus-visible:border-primary/50 focus-visible:ring-primary/30 data-[size=default]:h-11 data-[state=open]:border-primary/50"
+        >
+          <SelectValue placeholder="Choose a version" />
+        </SelectTrigger>
+        <SelectContent className="rounded-xl border-white/10 bg-popover/95 text-foreground shadow-xl backdrop-blur-md">
+          {versions.map((item) => (
+            <SelectItem
+              key={item}
+              value={item}
+              className="rounded-lg py-2 focus:bg-primary/15 focus:text-foreground data-[highlighted]:bg-primary/15 data-[state=checked]:text-foreground [&_svg]:text-primary"
+            >
+              {item}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {versions.length} versions for this engine.
+      </p>
+    </div>
+  )
 }
 
 function Chip({
