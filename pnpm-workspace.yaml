@@ -1,0 +1,5 @@
+# pnpm 10 skips dependency lifecycle scripts unless they are listed here
+# (the same list `pnpm approve-builds` writes). electron must run its install
+# script so the runtime is already on disk before electron-builder packages.
+onlyBuiltDependencies:
+  - electron
