@@ -3,6 +3,8 @@
  * The credential stays in the main process. The window never sees it.
  */
 
+const { presentPlaytime, PLAYTIME_UNAVAILABLE } = require("./playtime.cjs")
+
 const DEFAULT_API_BASE = "http://135.181.18.162:5055"
 const BAKED_SERVICE_KEY = "aetherion-launcher-friend-v1"
 const UNAVAILABLE = "Sandbox API is temporarily unavailable."
@@ -107,6 +109,30 @@ async function sandboxRestart(playerId, id) {
   return sandboxStart(playerId, id)
 }
 
+/**
+ * GET /api/player/playtime → { totalSeconds }.
+ * A missing route or a body without totalSeconds stays empty. Never invent a duration.
+ */
+async function playerPlaytime(playerId) {
+  try {
+    const data = await api("/player/playtime", { playerId })
+    return presentPlaytime(data)
+  } catch {
+    return { ...PLAYTIME_UNAVAILABLE }
+  }
+}
+
+/**
+ * TODO(control): the friend API has no plugin install or removal route.
+ * When Control adds GET/POST/DELETE /api/sandbox/servers/:id/plugins, replace this
+ * stub. Do not call Crafty from the launcher.
+ * A server payload may already include a read-only `plugins` array; the window
+ * can render that. This function does not pretend an install succeeded.
+ */
+function sandboxPlugins() {
+  return { supported: false, plugins: [] }
+}
+
 module.exports = {
   DEFAULT_API_BASE,
   BAKED_SERVICE_KEY,
@@ -123,4 +149,6 @@ module.exports = {
   sandboxStop,
   sandboxDelete,
   sandboxRestart,
+  playerPlaytime,
+  sandboxPlugins,
 }

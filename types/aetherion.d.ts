@@ -15,6 +15,50 @@ export type MinecraftVersionChoice = {
   pack: boolean
 }
 
+export type ModpackInstance = {
+  id: string
+  kind: "modrinth"
+  name: string
+  minecraftVersion: string
+  loader: { type: string; version: string }
+  projectId: string
+  versionId: string
+  directoryName: string
+}
+
+export type ModpackRegistry = {
+  selectedId: string
+  instances: ModpackInstance[]
+}
+
+export type ModpackInstallInput = {
+  projectId?: string
+  versionId: string
+  slug?: string
+  name?: string
+}
+
+export type ModrinthProject = {
+  projectId: string
+  slug: string
+  title: string
+  description: string
+  iconUrl: string
+  downloads: number
+  minecraftVersions: string[]
+  loaders: string[]
+}
+
+export type ModrinthVersion = {
+  id: string
+  projectId: string
+  name: string
+  versionNumber: string
+  gameVersions: string[]
+  loaders: string[]
+  datePublished: string
+}
+
 declare global {
   interface Window {
     aetherion?: {
@@ -38,6 +82,7 @@ declare global {
           serverPort?: number
           serverName?: string
           minecraftVersion?: string
+          instanceKind?: "modrinth"
         }) => Promise<{
           ok: boolean
           target?: {
@@ -94,6 +139,11 @@ declare global {
           motd: string | null
           mojang?: "online" | "unknown"
         }>
+        playtime: () => Promise<{
+          totalSeconds: number | null
+          available: boolean
+          label: string | null
+        }>
       }
       sandbox: {
         options: () => Promise<import("@/lib/launcher/sandbox").SandboxOptions>
@@ -109,6 +159,7 @@ declare global {
           server: import("@/lib/launcher/sandbox").SandboxServer
           live: import("@/lib/launcher/sandbox").SandboxLiveStatus
         }>
+        plugins: () => Promise<{ supported: boolean; plugins: Array<{ id?: string; name?: string }> }>
       }
       launcher: {
         openDataDirectory: () => Promise<{ ok: boolean }>
@@ -134,6 +185,21 @@ declare global {
           current: string
           versions: MinecraftVersionChoice[]
         }>
+      }
+      instances: {
+        list: () => Promise<ModpackRegistry>
+        select: (id: string) => Promise<ModpackRegistry>
+        remove: (id: string) => Promise<ModpackRegistry>
+        mods: (id: string) => Promise<Array<{ filename: string; enabled: boolean }>>
+        removeMod: (id: string, filename: string) => Promise<Array<{ filename: string; enabled: boolean }>>
+        open: (id: string) => Promise<{ ok: boolean }>
+        install: (input: ModpackInstallInput) => Promise<ModpackInstance>
+        ensurePack: (input: ModpackInstallInput) => Promise<ModpackInstance>
+        onProgress: (cb: (progress: { message: string; percent?: number }) => void) => () => void
+      }
+      modrinth: {
+        search: (query: string) => Promise<{ projects: ModrinthProject[] }>
+        versions: (projectId: string) => Promise<{ versions: ModrinthVersion[] }>
       }
       mods: {
         listPack: () => Promise<

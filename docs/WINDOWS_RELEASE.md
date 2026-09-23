@@ -1,22 +1,22 @@
 # Publish the Windows launcher
 
-## Launcher 0.3.9 — Minecraft 1.21.1 Fabric
+## Launcher 0.4.0 — Minecraft 1.21.1 Fabric
 
-This build keeps the 0.3.4 window, dashboard, and settings. Play installs the Fabric pack (loader 0.19.5), Java 21, and connects to `play.donnernet.de:25565`. Microsoft sign-in is required to play. Your server talks to the control API. See `docs/SANDBOX_API.md` and `README.md`.
+This build keeps Play, version switching, the sandbox tiers, and in-app update. Play on Minecraft 1.21.1 uses Quick Play (`--quickPlayMultiplayer play.donnernet.de:25565`) so the game opens on the realm. Older versions still use `--server` and `--port` when a join is requested. Microsoft sign-in is required to play. Your server talks to the control API. See `docs/SANDBOX_API.md` and `README.md`.
 
-Players install `Aetherion.Launcher.Setup.0.3.9.exe` once. That build checks GitHub Releases for `latest.yml` and installs newer versions inside the app. NSIS upgrades the same app id (`gg.aetherion.launcher`) and leaves the AppData folder in place. The taskbar id is the same app id, so the launcher is one button. The Microsoft window uses `skipTaskbar`. The installer is started with NSIS `/S` and Electron `windowsHide`, so the update does not open a command window.
+Players install `Aetherion.Launcher.Setup.0.4.0.exe` once. That build checks GitHub Releases for `latest.yml` and installs newer versions inside the app. NSIS upgrades the same app id (`gg.aetherion.launcher`) and leaves the AppData folder in place. The taskbar id is the same app id, so the launcher is one button. The Microsoft window uses `skipTaskbar`. The installer is started with NSIS `/S` and Electron `windowsHide`, so the update does not open a command window.
 
-v0.3.4 is still the latest GitHub Release and it has no `latest.yml` (only the Setup.exe and the blockmap). `https://github.com/robb-devo/launcheraetherion/releases/latest/download/latest.yml` returns 404, so every installed build correctly finds nothing to install. 0.3.7 and 0.3.8 were never tagged, so this workflow never published them. Tagging `v0.3.9` after merge is what makes in-app update work.
+v0.3.4 is still the latest GitHub Release in the notes from 0.3.9 and it has no `latest.yml` (only the Setup.exe and the blockmap). `https://github.com/robb-devo/launcheraetherion/releases/latest/download/latest.yml` returns 404 until a release that includes `latest.yml` is marked latest. 0.3.7 and 0.3.8 were never tagged. Tagging `v0.4.0` after merge is what makes in-app update pick up this build. The previous package version on main was 0.3.9.
 
 ### Version
 
 | Where | Value |
 | --- | --- |
-| `package.json` `version` | `0.3.9` |
+| `package.json` `version` | `0.4.0` |
 | Electron `LAUNCHER_VERSION` | read from `package.json` in `electron/main.cjs` |
 | `/download` and settings | `lib/launcher/version.ts` imports `package.json` |
-| NSIS artifact | `Aetherion.Launcher.Setup.0.3.9.exe` |
-| GitHub tag | `v0.3.9` |
+| NSIS artifact | `Aetherion.Launcher.Setup.0.4.0.exe` |
+| GitHub tag | `v0.4.0` |
 | Release repo | `robb-devo/launcheraetherion` |
 
 The tag and `package.json` version must match.
@@ -29,15 +29,15 @@ The tag and `package.json` version must match.
 ```powershell
 git checkout main
 git pull
-git tag v0.3.9
-git push origin v0.3.9
+git tag v0.4.0
+git push origin v0.4.0
 ```
 
 3. Wait for `Build Windows Release`. It runs `pnpm build:win:ci` and uploads a published release. The tag must equal `v` plus `package.json` `version`. The workflow refuses the release when `latest.yml` does not name `Aetherion.Launcher.Setup.<version>.exe`.
 
 - `dist/latest.yml` (required; installed clients read this from the latest release)
-- `dist/Aetherion.Launcher.Setup.0.3.9.exe` (one-time installer)
-- `dist/Aetherion.Launcher.Setup.0.3.9.exe.blockmap`
+- `dist/Aetherion.Launcher.Setup.0.4.0.exe` (one-time installer)
+- `dist/Aetherion.Launcher.Setup.0.4.0.exe.blockmap`
 
 4. Confirm the release is not a draft, is marked latest, and that `latest.yml` is attached:
 
@@ -45,7 +45,7 @@ git push origin v0.3.9
 https://github.com/robb-devo/launcheraetherion/releases/latest/download/latest.yml
 ```
 
-Anyone on an older installed build receives 0.3.9 in the app only after this release is the latest one and `latest.yml` is attached. The setup executable is only the first install. A release without `latest.yml` looks like "no update" to electron-updater.
+Anyone on an older installed build receives 0.4.0 in the app only after this release is the latest one and `latest.yml` is attached. The setup executable is only the first install. A release without `latest.yml` looks like "no update" to electron-updater.
 
 Do not republish the old Forge modpack. The client pack is the Fabric manifest shipped in the app.
 

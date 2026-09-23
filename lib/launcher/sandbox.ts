@@ -54,6 +54,14 @@ export interface SandboxServer {
   address: string
   onlineMode?: boolean
   running?: boolean | null
+  modpack?: {
+    source?: string
+    projectId?: string
+    versionId?: string
+    name?: string
+    slug?: string
+  } | null
+  plugins?: Array<{ id?: string; name?: string }>
 }
 
 export interface SandboxLiveStatus {

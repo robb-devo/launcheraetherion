@@ -125,7 +125,7 @@ export function MinecraftTab() {
       >
         <SettingsRow
           label="Connect to the server automatically"
-          description="Joins Aetherion as soon as the game opens."
+          description="Minecraft 1.21.1 opens straight on play.donnernet.de. Turn this off to stop at the title screen."
         >
           <Switch
             checked={settings.autoConnectServer}

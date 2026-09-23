@@ -18,6 +18,10 @@ const {
 } = require("./lib/runtime-plan.cjs")
 const { resolveLaunchTarget, sanitizeVersion, versionChoices } = require("./lib/launch-target.cjs")
 const { planForMinecraftVersion, packInstalledRelPaths } = require("./lib/managed-mods.cjs")
+const { directJoinGameArgs, describedJoinArgs } = require("./lib/direct-join.cjs")
+const { PLAYTIME_UNAVAILABLE } = require("./lib/playtime.cjs")
+const modrinthApi = require("./lib/modrinth.cjs")
+const instanceRegistry = require("./lib/instances.cjs")
 const { spawn } = require("node:child_process")
 const crypto = require("node:crypto")
 const fsSync = require("node:fs")
@@ -352,6 +356,52 @@ ipcMain.handle("sandbox:inspect", async (_event, id) => {
   const live = address ? await probeRealm(address.host, address.port) : { state: "unknown", players: null, ping: null }
   return { server, live }
 })
+ipcMain.handle("sandbox:plugins", () => controlApi.sandboxPlugins())
+ipcMain.handle("status:playtime", async () => {
+  try {
+    return await controlApi.playerPlaytime(await microsoftPlayerId())
+  } catch {
+    return { ...PLAYTIME_UNAVAILABLE }
+  }
+})
+ipcMain.handle("instances:list", () => readInstanceRegistry())
+ipcMain.handle("instances:select", async (_event, id) => {
+  const registry = await readInstanceRegistry()
+  const next = instanceRegistry.selectInstance(registry, id)
+  return writeInstanceRegistry(next)
+})
+ipcMain.handle("instances:remove", async (_event, id) => {
+  const registry = await readInstanceRegistry()
+  const existing = instanceRegistry.findInstance(registry, id)
+  if (!existing) throw new Error("That pack is not installed.")
+  const next = instanceRegistry.removeInstance(registry, id)
+  await fs.rm(instancePath(existing.directoryName), { recursive: true, force: true })
+  return writeInstanceRegistry(next)
+})
+ipcMain.handle("instances:mods", async (_event, id) => listModpackMods(id))
+ipcMain.handle("instances:removeMod", async (_event, payload) => {
+  const id = payload?.id
+  const filename = payload?.filename
+  return removeModpackMod(id, filename)
+})
+ipcMain.handle("instances:open", async (_event, id) => {
+  const registry = await readInstanceRegistry()
+  const existing = instanceRegistry.findInstance(registry, id)
+  if (!existing) throw new Error("That pack is not installed.")
+  const root = instancePath(existing.directoryName)
+  await fs.mkdir(root, { recursive: true })
+  const error = await shell.openPath(root)
+  if (error) throw new Error(error)
+  return { ok: true }
+})
+ipcMain.handle("instances:install", async (event, input) => installModrinthPack(input, event.sender))
+ipcMain.handle("instances:ensurePack", async (event, input) => ensureModrinthPack(input, event.sender))
+ipcMain.handle("modrinth:search", async (_event, query) => ({
+  projects: await modrinthApi.searchModpacks(query, { version: LAUNCHER_VERSION }),
+}))
+ipcMain.handle("modrinth:versions", async (_event, projectId) => ({
+  versions: await modrinthApi.listProjectVersions(projectId, { version: LAUNCHER_VERSION }),
+}))
 
 ipcMain.handle("settings:get", () => readLauncherSettings())
 ipcMain.handle("settings:update", async (_event, patch) => {
@@ -877,6 +927,9 @@ async function runUpdater(args, signal) {
   }
   const settings = await readLauncherSettings()
   const launchArgs = normalizeLaunchArgs(request, settings)
+  if (request.instanceKind === "modrinth") {
+    return launchModpackInstance(request, launchArgs, signal)
+  }
 
   emitLaunchProgress({
     phase: "fetching-manifest",
@@ -1011,14 +1064,25 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
     message: "Building the Minecraft launch plan...",
   })
 
-  const usePack = args?.usePack === true && args?.minecraftVersion === manifest.minecraft && manifest.minecraft === "1.21.1"
-  const versionId = usePack ? manifest.minecraft : args?.minecraftVersion || manifest.minecraft
+  const explicitFabric = args?.fabricProfile?.id ? args.fabricProfile : null
+  const usePack =
+    !explicitFabric &&
+    args?.usePack === true &&
+    args?.minecraftVersion === manifest.minecraft &&
+    manifest.minecraft === "1.21.1"
+  const versionId = explicitFabric?.minecraft || (usePack ? manifest.minecraft : args?.minecraftVersion || manifest.minecraft)
   const realm = packServer(manifest)
   let profileId
   let childProfile
   let parentId
   let parentProfile
-  if (usePack) {
+  if (explicitFabric) {
+    profileId = explicitFabric.id
+    const profilePath = path.join(root, "versions", profileId, `${profileId}.json`)
+    childProfile = await readJsonFile(profilePath)
+    parentId = childProfile.inheritsFrom || explicitFabric.minecraft || versionId
+    parentProfile = await ensureMinecraftVersionJson(root, parentId, signal)
+  } else if (usePack) {
     profileId = fabricProfileId(manifest)
     const profilePath = path.join(root, "versions", profileId, `${profileId}.json`)
     childProfile = await readJsonFile(profilePath)
@@ -1030,7 +1094,8 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
     parentProfile = await ensureMinecraftVersionJson(root, versionId, signal)
     childProfile = parentProfile
   }
-  const merged = usePack
+  const useLoaderProfile = Boolean(explicitFabric) || usePack
+  const merged = useLoaderProfile
     ? mergeVersionProfiles(parentProfile, childProfile)
     : {
         mainClass: parentProfile.mainClass,
@@ -1124,13 +1189,21 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
   const directPort = Number(args?.serverPort)
   if (args?.fullscreen) gameArgs.push("--fullscreen")
   let sandboxTarget = null
+  let joinTarget = null
   if (args?.isolated || directHost) {
     sandboxTarget = assertSandboxJoin(directHost, directPort)
-    gameArgs.push("--server", sandboxTarget.host)
-    gameArgs.push("--port", String(sandboxTarget.port))
-  } else if (args?.autoConnectServer) {
-    gameArgs.push("--server", realm.host)
-    gameArgs.push("--port", String(realm.port || AETHERION_SERVER_PORT))
+    joinTarget = sandboxTarget
+  } else if (args?.autoConnectServer && !explicitFabric) {
+    joinTarget = { host: realm.host, port: realm.port || AETHERION_SERVER_PORT }
+  }
+  if (joinTarget) {
+    gameArgs.push(
+      ...directJoinGameArgs({
+        host: joinTarget.host,
+        port: joinTarget.port,
+        minecraftVersion: versionId,
+      }),
+    )
   }
   await ensureMinecraftServerList(
     root,
@@ -1212,6 +1285,7 @@ function summarizeLaunchPlan(plan) {
     nativeArtifacts: plan.nativeArtifacts.length,
     jvmArgs: plan.jvmArgs.length,
     gameArgs: plan.gameArgs.length,
+    directJoin: describedJoinArgs(plan.gameArgs),
     commandArgs: plan.commandArgs.length,
     assetIndex: plan.assetIndex.id,
     assetObjects: plan.assetObjects.length,
@@ -2145,27 +2219,31 @@ function getMinecraftOsName() {
 }
 
 async function ensureFabricProfile(root, manifest, signal) {
-  const profileId = fabricProfileId(manifest)
+  return ensureFabricLoader(root, manifest.minecraft, manifest.loader.version, signal)
+}
+
+async function ensureFabricLoader(root, minecraftVersion, loaderVersion, signal) {
+  const profileId = `fabric-loader-${loaderVersion}-${minecraftVersion}`
   const jsonPath = path.join(root, "versions", profileId, `${profileId}.json`)
   if (fsSync.existsSync(jsonPath)) {
     emitLaunchProgress({
       phase: "installing-forge",
-      message: `Fabric ${manifest.loader.version} is already installed.`,
+      message: `Fabric ${loaderVersion} is already installed.`,
     })
     return profileId
   }
 
   emitLaunchProgress({
     phase: "installing-forge",
-    message: `Fetching Fabric ${manifest.loader.version} for Minecraft ${manifest.minecraft}...`,
+    message: `Fetching Fabric ${loaderVersion} for Minecraft ${minecraftVersion}...`,
   })
-  const url = `https://meta.fabricmc.net/v2/versions/loader/${manifest.minecraft}/${manifest.loader.version}/profile/json`
+  const url = `https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(minecraftVersion)}/${encodeURIComponent(loaderVersion)}/profile/json`
   const profile = await fetchJson(url, signal)
   await fs.mkdir(path.dirname(jsonPath), { recursive: true })
   await fs.writeFile(jsonPath, `${JSON.stringify(profile, null, 2)}\n`, "utf8")
   emitLaunchProgress({
     phase: "installing-forge",
-    message: `Fabric ${manifest.loader.version} is ready.`,
+    message: `Fabric ${loaderVersion} is ready.`,
   })
   return profileId
 }
@@ -2983,6 +3061,186 @@ async function runWithConcurrency(items, limit, worker) {
     }
   })
   await Promise.all(runners)
+}
+
+async function launchModpackInstance(request, launchArgs, signal) {
+  const registry = await readInstanceRegistry()
+  const instance = instanceRegistry.findInstance(registry, request.instanceId)
+  if (!instance) throw new Error("That pack is not installed.")
+  const root = instancePath(instance.directoryName)
+  await fs.mkdir(root, { recursive: true })
+  emitLaunchProgress({
+    phase: "computing-plan",
+    message: `Opening ${instance.name}`,
+  })
+
+  let fabricProfile = null
+  if (instance.loader?.type === "fabric") {
+    if (!instance.loader.version) throw new Error("This Fabric pack has no loader version.")
+    const profileId = await ensureFabricLoader(root, instance.minecraftVersion, instance.loader.version, signal)
+    fabricProfile = { id: profileId, minecraft: instance.minecraftVersion }
+  } else if (instance.loader?.type && instance.loader.type !== "vanilla") {
+    throw new Error(
+      `Play starts Fabric packs and vanilla. This pack uses ${instance.loader.type}. Its files stay in their own instance.`,
+    )
+  }
+
+  const planArgs = {
+    ...launchArgs,
+    minecraftVersion: instance.minecraftVersion,
+    usePack: false,
+    autoConnectServer: false,
+    fabricProfile,
+  }
+  let launchPlan = await buildMinecraftLaunchPlan(root, DEFAULT_MANIFEST, planArgs, signal)
+  if (!launchPlan.ready) {
+    await prepareMinecraftRuntime(root, launchPlan, signal)
+    launchPlan = await buildMinecraftLaunchPlan(root, DEFAULT_MANIFEST, planArgs, signal)
+  }
+  if (!launchPlan.ready) {
+    const listed = launchPlan.missing.slice(0, 5).join(", ")
+    throw new Error(
+      `Still missing ${launchPlan.missing.length} file(s) before launch. First missing: ${launchPlan.missing[0]}. ${listed}`,
+    )
+  }
+  const processInfo = await startMinecraft(launchPlan, signal)
+  emitLaunchProgress({
+    phase: "running",
+    message: `Minecraft started (PID ${processInfo.pid}).`,
+  })
+  if (launchPlan.closeOnLaunch) setTimeout(() => app.quit(), 700)
+  return {
+    minecraft: instance.minecraftVersion,
+    loader: instance.loader?.type === "fabric" ? instance.loader.version : null,
+    launchPlan: summarizeLaunchPlan(launchPlan),
+    process: processInfo,
+  }
+}
+
+async function ensureModrinthPack(input, sender) {
+  const versionId = String(input?.versionId || "").trim()
+  const registry = await readInstanceRegistry()
+  const existing = registry.instances.find((instance) => instance.versionId && instance.versionId === versionId)
+  if (existing) return existing
+  return installModrinthPack(input, sender, { select: false })
+}
+
+async function installModrinthPack(input, sender, options = {}) {
+  const versionId = String(input?.versionId || "").trim()
+  emitInstancesProgress(sender, { message: "Fetching the Modrinth pack...", percent: 2 })
+  const version = await modrinthApi.getVersion(versionId, { version: LAUNCHER_VERSION })
+  const packFile = modrinthApi.mrpackFile(version)
+  if (!packFile) throw new Error("That Modrinth version has no .mrpack file.")
+  emitInstancesProgress(sender, { message: "Downloading the pack index...", percent: 8 })
+  const buffer = await fetchHttpsBuffer(packFile.url)
+  const parsed = modrinthApi.readMrpack(buffer, {
+    projectId: input?.projectId || version.project_id,
+    versionId,
+    slug: input?.slug || version.project_id || version.name,
+    title: input?.name || version.name,
+  })
+  const minecraftVersion = sanitizeVersion(parsed.instance.minecraftVersion)
+  if (!minecraftVersion) throw new Error("This pack's Minecraft version cannot be installed.")
+  parsed.instance.minecraftVersion = minecraftVersion
+  if (!instanceRegistry.isModpackId(parsed.instance.directoryName)) {
+    throw new Error("Refusing to install into a built-in instance.")
+  }
+  const root = instancePath(parsed.instance.directoryName)
+  await fs.mkdir(root, { recursive: true })
+  const files = parsed.files
+  let done = 0
+  await runWithConcurrency(files, 4, async (file) => {
+    const target = safeResolve(root, file.path)
+    if (!(await fileMatchesHash(target, file.sha1, "sha1"))) {
+      const temp = `${target}.download`
+      await fs.mkdir(path.dirname(target), { recursive: true })
+      await downloadUrlToTemp(file.url, temp, "sha1", file.sha1)
+      await fs.rm(target, { force: true }).catch(() => undefined)
+      await fs.rename(temp, target)
+    }
+    done += 1
+    emitInstancesProgress(sender, {
+      message: `Installed ${path.posix.basename(file.path)}`,
+      percent: 10 + Math.round((done / Math.max(files.length, 1)) * 75),
+    })
+  })
+  for (const override of parsed.overrides) {
+    const target = safeResolve(root, override.path)
+    await fs.mkdir(path.dirname(target), { recursive: true })
+    await fs.writeFile(target, override.data)
+  }
+  if (parsed.instance.loader.type === "fabric") {
+    if (!parsed.instance.loader.version) throw new Error("This Fabric pack has no loader version.")
+    await ensureFabricLoader(root, minecraftVersion, parsed.instance.loader.version)
+  }
+  const registry = await readInstanceRegistry()
+  const next = instanceRegistry.upsertInstance(registry, parsed.instance, { select: options.select !== false })
+  await writeInstanceRegistry(next)
+  emitInstancesProgress(sender, { message: `${parsed.instance.name} is ready.`, percent: 100 })
+  return instanceRegistry.findInstance(next, parsed.instance.id)
+}
+
+async function listModpackMods(id) {
+  const registry = await readInstanceRegistry()
+  const existing = instanceRegistry.findInstance(registry, id)
+  if (!existing) throw new Error("That pack is not installed.")
+  const dir = path.join(instancePath(existing.directoryName), "mods")
+  const entries = await fs.readdir(dir).catch(() => [])
+  return entries
+    .filter((name) => /\.jar(\.disabled)?$/i.test(name))
+    .sort((left, right) => left.localeCompare(right))
+    .map((name) => ({
+      filename: name,
+      enabled: !name.toLowerCase().endsWith(".disabled"),
+    }))
+}
+
+async function removeModpackMod(id, filename) {
+  const name = String(filename || "")
+  if (!/^[^/\\]+\.jar(\.disabled)?$/i.test(name)) throw new Error("That file is not a mod jar.")
+  const registry = await readInstanceRegistry()
+  const existing = instanceRegistry.findInstance(registry, id)
+  if (!existing) throw new Error("That pack is not installed.")
+  const dir = path.join(instancePath(existing.directoryName), "mods")
+  const target = path.join(dir, name)
+  if (path.basename(target) !== name) throw new Error("That file is not a mod jar.")
+  await fs.rm(target, { force: true })
+  return listModpackMods(id)
+}
+
+async function fetchHttpsBuffer(url) {
+  if (!/^https:\/\//i.test(String(url || ""))) throw new Error("Pack downloads must use HTTPS.")
+  const response = await fetch(url, {
+    redirect: "follow",
+    headers: { "User-Agent": `AetherionLauncher/${LAUNCHER_VERSION}` },
+  })
+  if (!response.ok) throw new Error(`HTTP ${response.status} while downloading the pack.`)
+  return Buffer.from(await response.arrayBuffer())
+}
+
+function instanceRegistryPath() {
+  return path.join(app.getPath("userData"), "instances-index.json")
+}
+
+async function readInstanceRegistry() {
+  try {
+    return instanceRegistry.normalizeRegistry(JSON.parse(await fs.readFile(instanceRegistryPath(), "utf8")))
+  } catch (error) {
+    if (error?.code !== "ENOENT") console.warn("[aetherion] failed to read instances-index.json", error)
+    return instanceRegistry.normalizeRegistry(null)
+  }
+}
+
+async function writeInstanceRegistry(registry) {
+  const next = instanceRegistry.normalizeRegistry(registry)
+  await fs.mkdir(path.dirname(instanceRegistryPath()), { recursive: true })
+  await fs.writeFile(instanceRegistryPath(), `${JSON.stringify(next, null, 2)}\n`, "utf8")
+  return next
+}
+
+function emitInstancesProgress(sender, progress) {
+  const target = sender || mainWindow?.webContents
+  target?.send("instances:progress", progress)
 }
 
 function instancePath(instanceId) {

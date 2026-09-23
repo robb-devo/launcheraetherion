@@ -14,7 +14,7 @@ import { publicAssetPath } from "@/lib/public-path"
 import { LAUNCHER_VERSION } from "@/lib/launcher/version"
 import { AetherionMark } from "./aetherion-mark"
 import { LaunchProgressOverlay } from "./launch-progress"
-import type { LauncherUpdateState, MinecraftVersionChoice } from "@/types/aetherion"
+import type { LauncherUpdateState, MinecraftVersionChoice, ModpackInstance } from "@/types/aetherion"
 
 type RealmStatus = {
   state: "online" | "offline" | "unknown"
@@ -37,6 +37,10 @@ export function Dashboard() {
   const [versions, setVersions] = useState<MinecraftVersionChoice[]>([
     { id: CLIENT_PACK.minecraft, label: `${CLIENT_PACK.minecraft} · Aetherion`, pack: true },
   ])
+  const [packs, setPacks] = useState<ModpackInstance[]>([])
+  const [packSelection, setPackSelection] = useState("aetherion")
+  const [playtimeLabel, setPlaytimeLabel] = useState<string | null>(null)
+  const [playtimeKnown, setPlaytimeKnown] = useState(false)
   const [update, setUpdate] = useState<LauncherUpdateState | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -89,6 +93,41 @@ export function Dashboard() {
   }, [])
 
   useEffect(() => {
+    window.aetherion?.instances
+      ?.list()
+      .then((registry) => {
+        setPacks(registry.instances || [])
+        if (registry.selectedId && registry.selectedId !== "aetherion") setPackSelection(registry.selectedId)
+      })
+      .catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    const playtime = window.aetherion?.status?.playtime
+    if (!playtime) return
+    let stopped = false
+    const load = () => {
+      playtime()
+        .then((result) => {
+          if (stopped) return
+          setPlaytimeKnown(Boolean(result?.available))
+          setPlaytimeLabel(result?.label ?? null)
+        })
+        .catch(() => {
+          if (stopped) return
+          setPlaytimeKnown(false)
+          setPlaytimeLabel(null)
+        })
+    }
+    load()
+    const timer = window.setInterval(load, 60000)
+    return () => {
+      stopped = true
+      window.clearInterval(timer)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!window.aetherion?.status) return
     let stopped = false
     const load = () => {
@@ -130,18 +169,20 @@ export function Dashboard() {
     }
     abortRef.current = controller
     setProgress({ phase: "fetching-manifest", message: "Fetching the pack..." })
+    const selectedPack = packSelection !== "aetherion" ? packs.find((pack) => pack.id === packSelection) : null
 
     try {
       await window.aetherion.launch.start({
         accountId: activeAccount.id,
-        instanceId: CLIENT_PACK.id,
+        instanceId: selectedPack?.id || CLIENT_PACK.id,
         fullscreen: settings.minecraft.fullscreen,
         width: settings.minecraft.resolution.width,
         height: settings.minecraft.resolution.height,
-        autoConnectServer: settings.minecraft.autoConnectServer,
-        minecraftVersion: settings.minecraft.version || CLIENT_PACK.minecraft,
+        autoConnectServer: selectedPack ? false : settings.minecraft.autoConnectServer,
+        minecraftVersion: selectedPack?.minecraftVersion || settings.minecraft.version || CLIENT_PACK.minecraft,
         detachProcess: settings.minecraft.detachProcess,
         closeOnLaunch: settings.minecraft.closeOnLaunch,
+        ...(selectedPack ? { instanceKind: "modrinth" as const } : {}),
       })
       setTimeout(() => {
         setProgress((current) => (current?.phase === "running" ? null : current))
@@ -167,11 +208,21 @@ export function Dashboard() {
   }
 
   function setMinecraftVersion(version: string) {
+    setPackSelection("aetherion")
     setSettings((current) => ({ ...current, minecraft: { ...current.minecraft, version } }))
+    window.aetherion?.instances?.select("aetherion").catch(() => undefined)
     window.aetherion?.settings
       .update({ minecraft: { ...settings.minecraft, version } })
       .then(setSettings)
       .catch((err) => console.warn("[aetherion] failed to save version", err))
+  }
+
+  function selectPack(id: string) {
+    setPackSelection(id)
+    window.aetherion?.instances
+      ?.select(id)
+      .then((registry) => setPacks(registry.instances || []))
+      .catch((err) => console.warn("[aetherion] failed to select pack", err))
   }
 
   function cancel() {
@@ -183,6 +234,9 @@ export function Dashboard() {
   }
 
   const selectedVersion = settings.minecraft.version || CLIENT_PACK.minecraft
+  const selectedPack = packSelection !== "aetherion" ? packs.find((pack) => pack.id === packSelection) : null
+  const aetherionChoice = versions.find((item) => item.pack) || versions[0]
+  const otherVersions = versions.filter((item) => item.id !== aetherionChoice?.id)
   const updateMode =
     update?.status === "available" || update?.status === "downloading" || update?.status === "ready"
 
@@ -232,6 +286,15 @@ export function Dashboard() {
             </p>
             <p className="mt-3 text-sm text-foreground/70">
               {PACK_LABEL}
+            </p>
+            <p
+              className="mt-2 text-sm text-foreground/80"
+              title="Shown when Control answers GET /api/player/playtime with totalSeconds. Empty means the route has not reported a duration."
+            >
+              <span className="aetherion-kicker">Playtime</span>
+              <span className="ml-2 font-medium text-foreground">
+                {playtimeKnown && playtimeLabel ? playtimeLabel : "—"}
+              </span>
             </p>
           </div>
         </div>
@@ -303,23 +366,51 @@ export function Dashboard() {
               <div className="text-right">
                 <p className="aetherion-kicker">Instance</p>
                 <p className="mt-1 text-sm font-medium text-foreground">
-                  {selectedVersion === CLIENT_PACK.minecraft ? CLIENT_PACK.name : `Minecraft ${selectedVersion}`}
+                  {selectedPack
+                    ? selectedPack.name
+                    : selectedVersion === CLIENT_PACK.minecraft
+                      ? CLIENT_PACK.name
+                      : `Minecraft ${selectedVersion}`}
                 </p>
                 <label className="mt-1 block text-xs text-muted-foreground">
-                  <span className="sr-only">Minecraft version</span>
+                  <span className="sr-only">Instance</span>
                   <select
-                    aria-label="Minecraft version"
-                    value={selectedVersion}
-                    onChange={(event) => setMinecraftVersion(event.target.value)}
-                    className="max-w-[168px] bg-transparent text-right text-xs text-muted-foreground outline-none"
+                    aria-label="Instance"
+                    value={selectedPack ? `pack:${selectedPack.id}` : selectedVersion}
+                    onChange={(event) => {
+                      const value = event.target.value
+                      if (value.startsWith("pack:")) selectPack(value.slice("pack:".length))
+                      else setMinecraftVersion(value)
+                    }}
+                    className="max-w-[190px] bg-transparent text-right text-xs text-muted-foreground outline-none"
                   >
-                    {versions.map((item) => (
+                    {aetherionChoice ? (
+                      <option key={aetherionChoice.id} value={aetherionChoice.id}>
+                        {aetherionChoice.label}
+                      </option>
+                    ) : null}
+                    {packs.map((pack) => (
+                      <option key={pack.id} value={`pack:${pack.id}`}>
+                        {pack.name} · {pack.minecraftVersion}
+                      </option>
+                    ))}
+                    {otherVersions.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.label}
                       </option>
                     ))}
                   </select>
                 </label>
+                <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                  {selectedPack
+                    ? "Own pack"
+                    : selectedVersion === CLIENT_PACK.minecraft && settings.minecraft.autoConnectServer
+                      ? "Joins the realm"
+                      : "Title screen"}
+                </p>
+                <Link href="/settings/instances" className="mt-1 inline-block text-[11px] text-primary/80 hover:text-primary">
+                  Packs
+                </Link>
               </div>
 
               <div className="flex flex-col items-stretch">

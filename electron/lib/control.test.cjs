@@ -30,6 +30,11 @@ test("bearer defaults to the friend key and can be overridden by env", () => {
   else process.env.LAUNCHER_SERVICE_KEY = previousLauncher
 })
 
+test("playtime route is the documented player endpoint", () => {
+  assert.equal(control.apiUrl("/player/playtime"), `${control.DEFAULT_API_BASE}/api/player/playtime`)
+  assert.equal(control.sandboxPlugins().supported, false)
+})
+
 test("sandbox routes match the control contract", () => {
   assert.equal(control.apiBase(), control.DEFAULT_API_BASE)
   assert.equal(control.apiUrl("/sandbox/options"), `${control.DEFAULT_API_BASE}/api/sandbox/options`)
