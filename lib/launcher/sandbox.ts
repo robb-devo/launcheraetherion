@@ -18,6 +18,9 @@ export interface SandboxTypeOption {
 export interface SandboxOptions {
   poolGb?: number
   poolCores?: number
+  /** Per-server ceiling from SANDBOX_MAX_GB. Not the shared pool. */
+  maxRamGb?: number
+  maxCores?: number
   usedRamGb?: number
   remainingRamGb?: number
   usedCores?: number
@@ -71,10 +74,23 @@ export interface SandboxCreateInput {
   startAfterCreate?: boolean
 }
 
-export const SANDBOX_PRESETS: SandboxPresetOption[] = [
-  { value: "16", label: "16 GB", blurb: "Default", ramGb: 16, cpuCores: 4 },
-  { value: "24", label: "24 GB", blurb: "Larger worlds", ramGb: 24, cpuCores: 4 },
-]
+export {
+  SPARE_POOL_GB,
+  SPARE_POOL_CORES,
+  SANDBOX_PRESETS,
+  resolveSparePool,
+  tierFits,
+} from "./sandbox-pool.mjs"
+
+export interface SparePool {
+  known: boolean
+  totalRamGb: number
+  totalCores: number
+  usedRamGb: number
+  usedCores: number
+  remainingRamGb: number
+  remainingCores: number
+}
 
 export const SANDBOX_TYPES: SandboxTypeOption[] = [
   { value: "vanilla", label: "Vanilla", blurb: "Stock Minecraft" },

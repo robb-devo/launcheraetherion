@@ -17,9 +17,12 @@ import { cn } from "@/lib/utils"
 import {
   SANDBOX_PRESETS,
   SANDBOX_TYPES,
+  resolveSparePool,
+  tierFits,
   type SandboxCreateInput,
   type SandboxOptions,
   type SandboxLiveStatus,
+  type SandboxPresetOption,
   type SandboxServer,
   type SandboxType,
 } from "@/lib/launcher/sandbox"
@@ -40,7 +43,7 @@ export function SandboxFactory() {
   const [name, setName] = useState("")
   const [serverType, setServerType] = useState<SandboxType>("paper")
   const [version, setVersion] = useState("")
-  const [preset, setPreset] = useState("16")
+  const [preset, setPreset] = useState("easy")
   const [account, setAccount] = useState<Account | null>(null)
   const [settings, setSettings] = useState<LauncherSettings | null>(null)
   const [busy, setBusy] = useState(false)
@@ -57,7 +60,16 @@ export function SandboxFactory() {
     if (version && versions.includes(version)) return version
     return versions[0] || version
   }, [version, versions])
+  const pool = resolveSparePool(options)
   const presetInfo = SANDBOX_PRESETS.find((item) => item.value === preset) ?? SANDBOX_PRESETS[0]
+  const presetFits = tierFits(presetInfo, pool, options)
+
+  const poolKey = `${pool.known}:${pool.remainingRamGb}:${pool.remainingCores}:${options.maxRamGb ?? ""}:${options.maxCores ?? ""}`
+  useEffect(() => {
+    if (presetFits) return
+    const fallback = SANDBOX_PRESETS.find((item) => tierFits(item, pool, options))
+    if (fallback) setPreset(fallback.value)
+  }, [poolKey, preset, presetFits])
 
   useEffect(() => {
     if (!window.aetherion?.launch) return
@@ -144,6 +156,10 @@ export function SandboxFactory() {
     }
     if (!selectedVersion) {
       setError("Choose a version once the control API answers.")
+      return
+    }
+    if (!presetFits) {
+      setError(poolBlockMessage(presetInfo, pool))
       return
     }
     setBusy(true)
@@ -257,6 +273,7 @@ export function SandboxFactory() {
         </header>
 
         <div ref={scrollRef} className="aetherion-scroll min-h-0 flex-1 space-y-6 overflow-y-auto px-8 py-6">
+          <PoolOverview pool={pool} yours={servers.length} />
           {selected ? (
             <SandboxDetail
               server={selected}
@@ -344,17 +361,28 @@ export function SandboxFactory() {
 
             <p className="mt-5 text-xs uppercase tracking-[0.16em] text-muted-foreground">RAM / CPU</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {SANDBOX_PRESETS.map((item) => (
-                <Chip key={item.value} active={preset === item.value} onClick={() => setPreset(item.value)}>
-                  {item.label}
-                  <span className="ml-2 text-[10px] text-muted-foreground">
-                    {item.ramGb}G · {item.cpuCores}C
-                  </span>
-                </Chip>
-              ))}
+              {SANDBOX_PRESETS.map((item) => {
+                const fits = tierFits(item, pool, options)
+                return (
+                  <Chip
+                    key={item.value}
+                    active={preset === item.value}
+                    disabled={!fits}
+                    title={fits ? item.blurb : poolBlockMessage(item, pool)}
+                    onClick={() => setPreset(item.value)}
+                  >
+                    {item.label}
+                    <span className="ml-2 text-[10px] text-muted-foreground">
+                      {item.ramGb}G · {item.cpuCores}C
+                    </span>
+                  </Chip>
+                )
+              })}
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              {presetInfo.blurb}. Join address uses the host the control API assigns.
+              {presetFits
+                ? `${presetInfo.blurb}. ${presetInfo.ramGb} GB and ${presetInfo.cpuCores} core${presetInfo.cpuCores === 1 ? "" : "s"} from the spare pool.`
+                : poolBlockMessage(presetInfo, pool)}
             </p>
 
             {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
@@ -362,7 +390,7 @@ export function SandboxFactory() {
 
             <Button
               type="button"
-              disabled={busy}
+              disabled={busy || !presetFits}
               onClick={() => void createServer()}
               className="mt-5 h-11 bg-primary px-6 font-serif tracking-[0.16em] text-primary-foreground hover:bg-primary/90"
             >
@@ -643,24 +671,100 @@ function VersionSelect({
   )
 }
 
+function PoolOverview({
+  pool,
+  yours,
+}: {
+  pool: ReturnType<typeof resolveSparePool>
+  yours: number
+}) {
+  return (
+    <section className="aetherion-glass rounded-2xl p-5">
+      <p className="aetherion-kicker text-primary/85!">Spare pool</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Shared by every sandbox. Other people&apos;s servers stay private, and this does not touch the live realm.
+      </p>
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div>
+          <p className="aetherion-kicker">Your servers</p>
+          <p className="mt-1.5 text-sm font-medium text-foreground">{yours}</p>
+        </div>
+        <PoolMeter
+          label="RAM"
+          used={pool.known ? pool.usedRamGb : null}
+          total={pool.known ? pool.totalRamGb : null}
+          unit="GB"
+        />
+        <PoolMeter
+          label="CPU"
+          used={pool.known ? pool.usedCores : null}
+          total={pool.known ? pool.totalCores : null}
+          unit={pool.totalCores === 1 ? "core" : "cores"}
+        />
+      </div>
+      {!pool.known && (
+        <p className="mt-3 text-xs text-muted-foreground">Pool totals load from the control API.</p>
+      )}
+    </section>
+  )
+}
+
+function PoolMeter({
+  label,
+  used,
+  total,
+  unit,
+}: {
+  label: string
+  used: number | null
+  total: number | null
+  unit: string
+}) {
+  const width = used != null && total != null && total > 0 ? Math.min(100, (used / total) * 100) : 0
+  return (
+    <div>
+      <p className="aetherion-kicker">{label}</p>
+      <p className="mt-1.5 text-sm font-medium text-foreground">
+        {used == null || total == null ? "—" : `${used} / ${total} ${unit}`}
+      </p>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function poolBlockMessage(tier: Pick<SandboxPresetOption, "ramGb" | "cpuCores">, pool: ReturnType<typeof resolveSparePool>) {
+  if (!pool.known) return "This size is larger than the spare pool allows."
+  return `${tier.ramGb} GB and ${tier.cpuCores} core${tier.cpuCores === 1 ? "" : "s"} do not fit. ${pool.remainingRamGb} GB and ${pool.remainingCores} core${pool.remainingCores === 1 ? "" : "s"} are free.`
+}
+
 function Chip({
   active,
+  disabled,
+  title,
   children,
   onClick,
 }: {
   active: boolean
+  disabled?: boolean
+  title?: string
   children: ReactNode
   onClick: () => void
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
+      title={title}
       onClick={onClick}
       className={cn(
         "h-9 rounded-full border px-3 text-xs tracking-wide transition",
-        active
-          ? "border-magic/50 bg-magic/15 text-foreground"
+        disabled && "cursor-not-allowed opacity-40",
+        active && !disabled
+          ? "border-primary/50 bg-primary/10 text-foreground"
           : "border-white/10 bg-white/4 text-muted-foreground hover:text-foreground",
+        disabled && "hover:text-muted-foreground",
       )}
     >
       {children}
