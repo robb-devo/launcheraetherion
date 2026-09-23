@@ -5,7 +5,7 @@
  * Adoptium é 100% gratuito, open-source e distribuído via GitHub Releases
  * no próprio repositório deles (sem precisar de CDN pago).
  *
- * Para Minecraft 1.19.2 + Forge 43.x, usamos Java 17 (recomendado pela Mojang).
+ * Minecraft 1.21.1 + Fabric uses Java 21.
  * A função `adoptiumUrl` monta URLs estáveis da Adoptium API.
  */
 

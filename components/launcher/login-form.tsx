@@ -3,43 +3,28 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { AlertCircle, ArrowRight, User, X } from "lucide-react"
+import { AlertCircle, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { addOfflineAccount, validateOfflineUsername } from "@/lib/launcher/accounts"
-import type { AccountsState } from "@/lib/launcher/types"
 import { AetherionMark } from "./aetherion-mark"
 
 export function LoginForm() {
   const router = useRouter()
-  const [username, setUsername] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleMicrosoft() {
     if (busy) return
-
-    const validation = validateOfflineUsername(username)
-    if (validation) {
-      setError(validation)
+    if (!window.aetherion?.accounts) {
+      setError("Microsoft sign-in runs in the desktop launcher.")
       return
     }
-
     setBusy(true)
     setError(null)
-
     try {
-      if (window.aetherion?.accounts) {
-        await window.aetherion.accounts.addOffline(username)
-      } else {
-        const previewState: AccountsState = { activeId: null, accounts: [] }
-        await addOfflineAccount(previewState, username)
-      }
+      await window.aetherion.accounts.addMicrosoft()
       router.push("/launcher")
     } catch (e) {
-      setError(readableError(e, "Could not save that name."))
+      setError(readableError(e, "Microsoft sign-in failed."))
     } finally {
       setBusy(false)
     }
@@ -61,11 +46,11 @@ export function LoginForm() {
             <p className="mt-3 font-serif text-[2rem] leading-[1.15] text-balance text-foreground drop-shadow-[0_8px_24px_rgba(0,0,0,0.7)]">
               Cross the veil.
               <br />
-              <span className="text-primary">Forge your legend.</span>
+              <span className="text-primary">Step into the realm.</span>
             </p>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-foreground/70">
-              Enter your name, then press play. The launcher prepares the realm
-              and starts the game.
+              Sign in with Microsoft, then press play. The launcher prepares the
+              realm and starts the game.
             </p>
           </div>
         </div>
@@ -83,51 +68,24 @@ export function LoginForm() {
         <div className="aetherion-rise w-full max-w-sm">
           <h1 className="font-serif text-3xl tracking-[0.12em] text-foreground">Enter</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your name is saved only on this computer.
+            Microsoft is the way in. The launcher uses that profile to play.
           </p>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-            <Field>
-              <FieldLabel htmlFor="username" className="aetherion-kicker">
-                Player name
-              </FieldLabel>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                <Input
-                  id="username"
-                  value={username}
-                  onChange={(e) => {
-                    setUsername(e.target.value)
-                    setError(null)
-                  }}
-                  placeholder="Steve"
-                  className="h-11 border-white/10 bg-white/4 pl-10"
-                  required
-                  minLength={3}
-                  maxLength={16}
-                />
-              </div>
-              <FieldDescription className="text-[11px]">
-                Use 3 to 16 characters. No password is asked for or sent.
-              </FieldDescription>
-            </Field>
+          <Button
+            type="button"
+            disabled={busy}
+            onClick={() => void handleMicrosoft()}
+            className="mt-8 h-11 w-full gap-2 bg-primary font-serif tracking-[0.16em] text-primary-foreground hover:bg-primary/90 aetherion-gold-glow aetherion-sheen"
+          >
+            {busy ? "WAITING..." : "SIGN IN WITH MICROSOFT"}
+          </Button>
 
-            {error && (
-              <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3">
-                <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
-                <p className="text-xs text-foreground/90 leading-relaxed">{error}</p>
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              disabled={busy}
-              className="mt-6 h-11 w-full gap-2 bg-primary font-serif tracking-[0.2em] text-primary-foreground hover:bg-primary/90 aetherion-gold-glow aetherion-sheen"
-            >
-              {busy ? "SAVING..." : "CONTINUE"}
-              <ArrowRight className="size-4" />
-            </Button>
-          </form>
+          {error && (
+            <div className="mt-4 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3">
+              <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
+              <p className="text-xs text-foreground/90 leading-relaxed">{error}</p>
+            </div>
+          )}
 
           <p className="mt-8 text-center text-[11px] leading-relaxed text-muted-foreground/80">
             Aetherion does not store account data on its own servers.

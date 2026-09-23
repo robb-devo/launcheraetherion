@@ -87,7 +87,7 @@ export interface Manifest {
   publishedAt?: string
 
   /** Forge installer — baixado para /forge/ e executado no primeiro run */
-  forge: ForgeEntry
+  forge?: ForgeEntry
 
   /** Todos os arquivos do modpack (mods, configs, resourcepacks) */
   files: ManifestFile[]
@@ -197,6 +197,8 @@ export interface LauncherSettings {
 }
 
 export interface MinecraftSettings {
+  /** Selected client version. 1.21.1 is the Aetherion pack. */
+  version?: string
   resolution: { width: number; height: number }
   fullscreen: boolean
   autoConnectServer: boolean

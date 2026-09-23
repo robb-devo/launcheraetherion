@@ -8,41 +8,20 @@ import type {
   Account,
   DropinMod,
   LauncherSettings,
-  Manifest,
+  ManifestFile,
   MojangStatus,
   ServerStatus,
 } from "./types"
 
-export const MOCK_ACCOUNTS: Account[] = [
-  {
-    id: "acc_1",
-    type: "microsoft",
-    username: "Aetherion_Main",
-    uuid: "1a04d0e5-45db-36ef-974f-c53c337e46cb",
-    avatarUrl: "/minecraft-avatar-dark-knight.jpg",
-    lastUsedAt: "2026-04-17T22:10:00Z",
-  },
-  {
-    id: "acc_2",
-    type: "offline",
-    username: "Guardian",
-    uuid: "1c25df42-1e71-3d46-b785-40e44b7367f4",
-    avatarUrl: "/minecraft-avatar-wizard.jpg",
-    lastUsedAt: "2026-04-15T18:32:00Z",
-  },
-  {
-    id: "acc_3",
-    type: "offline",
-    username: "RuneKeeper",
-    uuid: "8b8c2d09-4d8d-4b79-b612-6f1b2e3c4d5e",
-    avatarUrl: "/minecraft-avatar-ranger.jpg",
-  },
-]
+export const CLIENT_PACK = manifestData
+
+export const MOCK_ACCOUNTS: Account[] = []
 
 export const MOCK_DROPIN_MODS: DropinMod[] = []
 
 export const DEFAULT_SETTINGS: LauncherSettings = {
   minecraft: {
+    version: "1.21.1",
     resolution: { width: 1280, height: 720 },
     fullscreen: false,
     autoConnectServer: true,
@@ -52,7 +31,7 @@ export const DEFAULT_SETTINGS: LauncherSettings = {
   java: {
     minRamMb: 4096,
     maxRamMb: 8192,
-    executablePath: "C:\\Program Files\\Eclipse Adoptium\\jdk-17\\bin\\javaw.exe",
+    executablePath: "",
     jvmArgs:
       "-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions",
     autoDownloadRuntime: true,
@@ -66,10 +45,10 @@ export const DEFAULT_SETTINGS: LauncherSettings = {
 }
 
 export const MOCK_SERVER_STATUS: ServerStatus = {
-  online: true,
-  players: { current: 147, max: 1000 },
-  motd: "Aetherion - Ethereal Realm",
-  ping: 32,
+  online: false,
+  players: { current: 0, max: 0 },
+  motd: "",
+  ping: 0,
 }
 
 export const MOCK_MOJANG_STATUS: MojangStatus = {
@@ -77,15 +56,28 @@ export const MOCK_MOJANG_STATUS: MojangStatus = {
   session: "green",
 }
 
-export const MOCK_MANIFEST = manifestData as Manifest
+export const REQUIRED_MODS: ManifestFile[] = CLIENT_PACK.mods.map((mod) => ({
+  path: `mods/${mod.filename}`,
+  url: mod.url,
+    sha256: "",
+    size: 0,
+    type: "optional",
+    defaultEnabled: true,
+    id: mod.slug,
+  name: mod.slug,
+  version: mod.filename,
+}))
 
-export const REQUIRED_MODS = MOCK_MANIFEST.files.filter((file) => file.type === "required")
-export const OPTIONAL_MODS = MOCK_MANIFEST.files.filter((file) => file.type === "optional")
+export const OPTIONAL_MODS: ManifestFile[] = []
+
+export const PACK_SHADERS = CLIENT_PACK.shaderpacks
+
+export const PACK_LABEL = `${CLIENT_PACK.minecraft} · Fabric ${CLIENT_PACK.loader.version}`
 
 export const MOCK_MANIFEST_PREVIEW = {
-  version: MOCK_MANIFEST.version,
-  name: MOCK_MANIFEST.name,
-  minecraft: MOCK_MANIFEST.minecraft,
-  forgeVersion: MOCK_MANIFEST.forge.version,
-  publishedAt: MOCK_MANIFEST.publishedAt,
+  version: CLIENT_PACK.version,
+  name: CLIENT_PACK.name,
+  minecraft: CLIENT_PACK.minecraft,
+  loaderVersion: CLIENT_PACK.loader.version,
+  instanceId: CLIENT_PACK.id,
 } as const

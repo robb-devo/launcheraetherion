@@ -6,11 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { SettingsRow, SettingsSection } from "@/components/launcher/settings-shell"
-import { DEFAULT_SETTINGS } from "@/lib/launcher/mock-data"
+import { DEFAULT_SETTINGS, CLIENT_PACK } from "@/lib/launcher/mock-data"
 
 export function MinecraftTab() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS.minecraft)
   const [instancePath, setInstancePath] = useState(settings.gameDirectory ?? "")
+  const [versions, setVersions] = useState<Array<{ id: string; label: string }>>([
+    { id: CLIENT_PACK.minecraft, label: `${CLIENT_PACK.minecraft} · Aetherion` },
+  ])
 
   useEffect(() => {
     if (!window.aetherion?.settings) return
@@ -27,6 +30,13 @@ export function MinecraftTab() {
       .getPaths()
       .then((paths) => setInstancePath(paths.instancePath))
       .catch(() => undefined)
+
+    window.aetherion?.minecraft
+      ?.versions()
+      .then((list) => {
+        if (list.versions?.length) setVersions(list.versions)
+      })
+      .catch(() => undefined)
   }, [])
 
   function updateMinecraft(next: typeof settings | ((current: typeof settings) => typeof settings)) {
@@ -34,9 +44,10 @@ export function MinecraftTab() {
       const resolved = typeof next === "function" ? next(current) : next
       window.aetherion?.settings
         .update({ minecraft: resolved })
-        .then((state) => {
+        .then(async (state) => {
           setSettings(state.minecraft)
-          setInstancePath(state.minecraft.gameDirectory ?? instancePath)
+          const paths = await window.aetherion?.settings.getPaths()
+          if (paths?.instancePath) setInstancePath(paths.instancePath)
         })
         .catch((err) => console.warn("[aetherion] failed to save minecraft settings", err))
       return resolved
@@ -45,6 +56,26 @@ export function MinecraftTab() {
 
   return (
     <>
+      <SettingsSection
+        title="Version"
+        description="1.21.1 keeps the Aetherion Fabric pack in the default folder. Any other version starts without those mods."
+      >
+        <SettingsRow label="Minecraft version" description="Used by Play and when joining a server of that version.">
+          <select
+            aria-label="Minecraft version"
+            value={settings.version || CLIENT_PACK.minecraft}
+            onChange={(event) => updateMinecraft((current) => ({ ...current, version: event.target.value }))}
+            className="h-9 rounded-md border border-white/10 bg-input/40 px-3 text-sm text-foreground"
+          >
+            {versions.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </SettingsRow>
+      </SettingsSection>
+
       <SettingsSection
         title="Video"
         description="Starting resolution and how the game fills the screen."

@@ -1,21 +1,15 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { FolderOpen, Lock, Plus, RefreshCw, Trash2, Upload } from "lucide-react"
+import { FolderOpen, RefreshCw, Trash2, Upload } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { SettingsSection } from "@/components/launcher/settings-shell"
 import {
   MOCK_DROPIN_MODS,
   OPTIONAL_MODS,
+  PACK_SHADERS,
   REQUIRED_MODS,
 } from "@/lib/launcher/mock-data"
 import type { DropinMod, ManifestFile } from "@/lib/launcher/types"
@@ -29,14 +23,39 @@ function formatSize(bytes: number) {
 }
 
 export function ModsTab() {
+  const [packMods, setPackMods] = useState(REQUIRED_MODS)
   const [optional, setOptional] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(OPTIONAL_MODS.map((m) => [m.path, m.defaultEnabled ?? false])),
+    Object.fromEntries(REQUIRED_MODS.map((mod) => [mod.path, mod.defaultEnabled !== false])),
   )
   const [dropins, setDropins] = useState<DropinMod[]>(MOCK_DROPIN_MODS)
   const [status, setStatus] = useState("Local drop-ins are ready.")
+  const [minecraftVersion, setMinecraftVersion] = useState("1.21.1")
 
   useEffect(() => {
+    window.aetherion?.settings
+      ?.get()
+      .then((settings) => setMinecraftVersion(settings.minecraft.version || "1.21.1"))
+      .catch(() => undefined)
     reloadDropins()
+    window.aetherion?.mods
+      ?.listPack?.()
+      .then((mods) => {
+        if (!mods?.length) return
+        setPackMods(
+          mods.map((mod) => ({
+            path: mod.path,
+            url: "",
+            sha256: "",
+            size: 0,
+            type: "optional" as const,
+            defaultEnabled: true,
+            name: mod.name,
+            version: mod.version,
+          })),
+        )
+        setOptional(Object.fromEntries(mods.map((mod) => [mod.path, mod.enabled])))
+      })
+      .catch((err) => console.warn("[aetherion] failed to load pack mods", err))
   }, [])
 
   async function reloadDropins() {
@@ -118,16 +137,26 @@ export function ModsTab() {
   return (
     <>
       <SettingsSection
-        title={`Required (${REQUIRED_MODS.length})`}
-        description="Mods defined by the server manifest. They cannot be turned off."
+        title={`Aetherion mods (${packMods.length})`}
+        description={
+          minecraftVersion === "1.21.1"
+            ? "Installed in the normal mods folder for Minecraft 1.21.1. Turn any of them off. Other versions stay vanilla."
+            : `Minecraft ${minecraftVersion} does not use these mods. They stay on the 1.21.1 instance only.`
+        }
       >
         <div className="rounded-lg border border-border/50 divide-y divide-border/40">
-          {REQUIRED_MODS.map((mod) => (
-            <ModRow key={mod.path} mod={mod} locked />
+          {packMods.map((mod) => (
+            <ModRow
+              key={mod.path}
+              mod={mod}
+              enabled={optional[mod.path] !== false}
+              onToggle={(value) => toggleOptional(mod.path, value)}
+            />
           ))}
         </div>
       </SettingsSection>
 
+      {OPTIONAL_MODS.length > 0 ? (
       <SettingsSection
         title={`Optional (${OPTIONAL_MODS.length})`}
         description="You can turn these on or off."
@@ -143,6 +172,7 @@ export function ModsTab() {
           ))}
         </div>
       </SettingsSection>
+      ) : null}
 
       <SettingsSection
         title="Drop-in Mods"
@@ -217,23 +247,22 @@ export function ModsTab() {
 
       <SettingsSection
         title="Shaderpacks"
-        description="Shaders need a capable PC. Install Iris or Oculus for support."
+        description="Iris loads the pack shader when the game starts."
       >
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-9 w-9 bg-transparent">
-            <Plus className="size-4" />
-          </Button>
-          <Select defaultValue="off">
-            <SelectTrigger className="h-9 flex-1 bg-input/40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="off">Off (Default)</SelectItem>
-              <SelectItem value="complementary">Complementary Shaders v4.7</SelectItem>
-              <SelectItem value="bsl">BSL Shaders v8.2</SelectItem>
-              <SelectItem value="sildurs">Sildur&apos;s Vibrant Shaders</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="rounded-lg border border-border/50 divide-y divide-border/40">
+          {PACK_SHADERS.map((shader) => (
+            <div key={shader.slug} className="flex items-center gap-4 px-4 py-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">{shader.slug}</p>
+                <p className="text-[11px] text-muted-foreground font-mono truncate">
+                  {shader.filename}
+                </p>
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 text-primary text-xs">
+                {shader.enable === false ? "Off" : "Enabled"}
+              </div>
+            </div>
+          ))}
         </div>
       </SettingsSection>
     </>
@@ -254,12 +283,10 @@ function getModHint(mod: ManifestFile) {
 
 function ModRow({
   mod,
-  locked,
   enabled,
   onToggle,
 }: {
   mod: ManifestFile
-  locked?: boolean
   enabled?: boolean
   onToggle?: (v: boolean) => void
 }) {
@@ -271,7 +298,7 @@ function ModRow({
       <div
         className={cn(
           "size-2 rounded-full shrink-0",
-          locked ? "bg-primary" : enabled ? "bg-magic" : "bg-muted",
+          enabled ? "bg-magic" : "bg-muted",
         )}
       />
       <div className="flex-1 min-w-0">
@@ -288,19 +315,16 @@ function ModRow({
           )}
         </div>
         <p className="text-[11px] text-muted-foreground">
-          {mod.version && `v${mod.version}`}
+        {mod.version
+          ? mod.version.endsWith(".jar") || mod.version.endsWith(".zip")
+            ? mod.version
+            : `v${mod.version}`
+          : null}
           {mod.version && mod.author && " • "}
           {mod.author}
         </p>
       </div>
-      {locked ? (
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted text-muted-foreground text-xs">
-          <Lock className="size-3" />
-          Locked
-        </div>
-      ) : (
-        <Switch checked={enabled ?? false} onCheckedChange={onToggle} />
-      )}
+      <Switch checked={enabled ?? false} onCheckedChange={onToggle} />
     </div>
   )
 }

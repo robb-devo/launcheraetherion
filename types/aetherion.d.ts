@@ -2,6 +2,19 @@ import type { AccountsState, LauncherSettings, LaunchProgress } from "@/lib/laun
 
 export {}
 
+export type LauncherUpdateState = {
+  status: "idle" | "checking" | "available" | "downloading" | "ready" | "none" | "error"
+  version: string | null
+  percent?: number
+  message: string
+}
+
+export type MinecraftVersionChoice = {
+  id: string
+  label: string
+  pack: boolean
+}
+
 declare global {
   interface Window {
     aetherion?: {
@@ -18,8 +31,13 @@ declare global {
           width: number
           height: number
           autoConnectServer?: boolean
+          isolated?: boolean
           detachProcess?: boolean
           closeOnLaunch?: boolean
+          serverHost?: string
+          serverPort?: number
+          serverName?: string
+          minecraftVersion?: string
         }) => Promise<{
           ok: boolean
           target?: {
@@ -65,6 +83,33 @@ declare global {
           }
         } | null>
       }
+      status: {
+        realm: () => Promise<{
+          host: string
+          port: number
+          state: "online" | "offline" | "unknown"
+          online: boolean | null
+          players: { current: number; max: number } | null
+          ping: number | null
+          motd: string | null
+          mojang?: "online" | "unknown"
+        }>
+      }
+      sandbox: {
+        options: () => Promise<import("@/lib/launcher/sandbox").SandboxOptions>
+        list: () => Promise<{ servers: import("@/lib/launcher/sandbox").SandboxServer[] }>
+        create: (
+          input: import("@/lib/launcher/sandbox").SandboxCreateInput,
+        ) => Promise<import("@/lib/launcher/sandbox").SandboxServer>
+        start: (id: string) => Promise<{ ok?: boolean; address?: string; running?: boolean | null }>
+        stop: (id: string) => Promise<{ ok?: boolean; address?: string; running?: boolean | null }>
+        remove: (id: string) => Promise<{ ok?: boolean; id?: string }>
+        restart: (id: string) => Promise<{ ok?: boolean; address?: string; running?: boolean | null }>
+        inspect: (id: string) => Promise<{
+          server: import("@/lib/launcher/sandbox").SandboxServer
+          live: import("@/lib/launcher/sandbox").SandboxLiveStatus
+        }>
+      }
       launcher: {
         openDataDirectory: () => Promise<{ ok: boolean }>
         openLogsDirectory: () => Promise<{ ok: boolean }>
@@ -75,7 +120,25 @@ declare global {
           totalBytes: number
         }>
       }
+      shell: {
+        openExternal: (url: string) => Promise<{ ok: boolean }>
+      }
+      updater: {
+        get: () => Promise<LauncherUpdateState>
+        check: () => Promise<LauncherUpdateState>
+        install: () => Promise<{ ok: boolean }>
+        onState: (cb: (state: LauncherUpdateState) => void) => () => void
+      }
+      minecraft: {
+        versions: () => Promise<{
+          current: string
+          versions: MinecraftVersionChoice[]
+        }>
+      }
       mods: {
+        listPack: () => Promise<
+          Array<{ path: string; name: string; version: string; enabled: boolean }>
+        >
         listDropins: () => Promise<import("@/lib/launcher/types").DropinMod[]>
         addDropins: () => Promise<import("@/lib/launcher/types").DropinMod[]>
         setOptional: (

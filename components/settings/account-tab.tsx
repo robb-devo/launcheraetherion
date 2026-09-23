@@ -1,19 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AlertCircle, Check, Trash2 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import type { AccountsState } from "@/lib/launcher/types"
-import { MOCK_ACCOUNTS } from "@/lib/launcher/mock-data"
-import {
-  addOfflineAccount,
-  removeAccount as removeAccountLib,
-  setActiveAccount,
-  validateOfflineUsername,
-} from "@/lib/launcher/accounts"
+import { removeAccount as removeAccountLib, setActiveAccount } from "@/lib/launcher/accounts"
 import { publicAssetPath } from "@/lib/public-path"
 import { cn } from "@/lib/utils"
 
@@ -24,11 +17,7 @@ import { cn } from "@/lib/utils"
  */
 export function AccountTab() {
   const router = useRouter()
-  const [state, setState] = useState<AccountsState>(() => ({
-    activeId: MOCK_ACCOUNTS[0]?.id ?? null,
-    accounts: MOCK_ACCOUNTS,
-  }))
-  const [username, setUsername] = useState("")
+  const [state, setState] = useState<AccountsState>({ activeId: null, accounts: [] })
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -42,28 +31,6 @@ export function AccountTab() {
         setError(e instanceof Error ? e.message : "Could not load local accounts."),
       )
   }, [])
-
-  const validationError = useMemo(
-    () => (username ? validateOfflineUsername(username) : null),
-    [username],
-  )
-
-  async function handleAddOffline() {
-    if (busy) return
-    setError(null)
-    setBusy(true)
-    try {
-      const next = window.aetherion?.accounts
-        ? await window.aetherion.accounts.addOffline(username)
-        : await addOfflineAccount(state, username)
-      setState(next)
-      setUsername("")
-    } catch (e) {
-      setError(readableError(e, "Could not add the account."))
-    } finally {
-      setBusy(false)
-    }
-  }
 
   async function handleRemove(id: string) {
     setError(null)
@@ -94,45 +61,38 @@ export function AccountTab() {
     }
   }
 
+  async function handleMicrosoft() {
+    if (busy) return
+    if (!window.aetherion?.accounts) {
+      setError("Microsoft sign-in runs in the desktop launcher.")
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      setState(await window.aetherion.accounts.addMicrosoft())
+    } catch (e) {
+      setError(readableError(e, "Microsoft sign-in failed."))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
-        <p className="text-sm font-medium text-foreground">Player name</p>
+        <p className="text-sm font-medium text-foreground">Microsoft</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Used in game. Saved only on this computer.
+          Used to play and to own your servers. Stays on this computer.
         </p>
-
-        <div className="mt-3 flex gap-2">
-          <Input
-            autoFocus
-            placeholder="Name (3–16 characters)"
-            value={username}
-            onChange={(e) => {
-              setUsername(e.target.value)
-              setError(null)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !validationError) handleAddOffline()
-            }}
-            maxLength={16}
-            className="bg-input/40 font-mono"
-            aria-invalid={!!validationError}
-          />
-          <Button
-            onClick={handleAddOffline}
-            disabled={!username || !!validationError || busy}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            Add
-          </Button>
-        </div>
-
-        {validationError && (
-          <p className="mt-2 text-xs text-destructive flex items-center gap-1.5">
-            <AlertCircle className="size-3" />
-            {validationError}
-          </p>
-        )}
+        <Button
+          type="button"
+          onClick={() => void handleMicrosoft()}
+          disabled={busy}
+          className="mt-3 bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          Sign in with Microsoft
+        </Button>
       </div>
 
       {error && (
@@ -150,12 +110,14 @@ export function AccountTab() {
         {state.accounts.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/60 p-8 text-center">
             <p className="text-sm text-muted-foreground">
-              No accounts yet. Add one above to get started.
+              No Microsoft accounts yet. Sign in above to play.
             </p>
           </div>
         ) : (
           <div className="space-y-2">
-            {state.accounts.map((acc) => {
+            {state.accounts
+              .filter((acc) => acc.type === "microsoft")
+              .map((acc) => {
               const active = acc.id === state.activeId
               return (
                 <div
@@ -182,7 +144,7 @@ export function AccountTab() {
                       {acc.username}
                     </p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground font-mono truncate">
-                      {acc.uuid}
+                      Microsoft · {acc.uuid}
                     </p>
                   </div>
 
