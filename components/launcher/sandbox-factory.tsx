@@ -174,6 +174,7 @@ export function SandboxFactory() {
         serverHost: host,
         serverPort: Number.isInteger(port) ? port : undefined,
         serverName: server.name,
+        minecraftVersion: server.version,
       })
       window.setTimeout(() => {
         setProgress((current) => (current?.phase === "running" ? null : current))

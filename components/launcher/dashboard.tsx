@@ -14,7 +14,7 @@ import { publicAssetPath } from "@/lib/public-path"
 import { LAUNCHER_VERSION } from "@/lib/launcher/version"
 import { AetherionMark } from "./aetherion-mark"
 import { LaunchProgressOverlay } from "./launch-progress"
-import type { LauncherUpdateState } from "@/types/aetherion"
+import type { LauncherUpdateState, MinecraftVersionChoice } from "@/types/aetherion"
 
 type RealmStatus = {
   state: "online" | "offline" | "unknown"
@@ -34,6 +34,10 @@ export function Dashboard() {
   const [settings, setSettings] = useState<LauncherSettings>(DEFAULT_SETTINGS)
   const [progress, setProgress] = useState<LaunchProgress | null>(null)
   const [realm, setRealm] = useState<RealmStatus>(UNKNOWN_REALM)
+  const [versions, setVersions] = useState<MinecraftVersionChoice[]>([
+    { id: CLIENT_PACK.minecraft, label: `${CLIENT_PACK.minecraft} · Aetherion`, pack: true },
+  ])
+  const [update, setUpdate] = useState<LauncherUpdateState | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -66,6 +70,22 @@ export function Dashboard() {
       .get()
       .then(setSettings)
       .catch((err) => console.warn("[aetherion] failed to load settings", err))
+  }, [])
+
+  useEffect(() => {
+    const updater = window.aetherion?.updater
+    if (!updater) return
+    updater.get().then(setUpdate).catch(() => undefined)
+    return updater.onState(setUpdate)
+  }, [])
+
+  useEffect(() => {
+    window.aetherion?.minecraft
+      ?.versions()
+      .then((list) => {
+        if (list.versions?.length) setVersions(list.versions)
+      })
+      .catch(() => undefined)
   }, [])
 
   useEffect(() => {
@@ -107,6 +127,7 @@ export function Dashboard() {
         width: settings.minecraft.resolution.width,
         height: settings.minecraft.resolution.height,
         autoConnectServer: settings.minecraft.autoConnectServer,
+        minecraftVersion: settings.minecraft.version || CLIENT_PACK.minecraft,
         detachProcess: settings.minecraft.detachProcess,
         closeOnLaunch: settings.minecraft.closeOnLaunch,
       })
@@ -126,6 +147,21 @@ export function Dashboard() {
     }
   }
 
+  function handleUpdate() {
+    if (!update || update.status !== "ready") return
+    window.aetherion?.updater.install().catch((err) => {
+      console.warn("[aetherion] failed to install update", err)
+    })
+  }
+
+  function setMinecraftVersion(version: string) {
+    setSettings((current) => ({ ...current, minecraft: { ...current.minecraft, version } }))
+    window.aetherion?.settings
+      .update({ minecraft: { ...settings.minecraft, version } })
+      .then(setSettings)
+      .catch((err) => console.warn("[aetherion] failed to save version", err))
+  }
+
   function cancel() {
     abortRef.current?.abort()
     window.aetherion?.launch.cancel().catch((err) => {
@@ -133,6 +169,10 @@ export function Dashboard() {
     })
     setProgress(null)
   }
+
+  const selectedVersion = settings.minecraft.version || CLIENT_PACK.minecraft
+  const updateMode =
+    update?.status === "available" || update?.status === "downloading" || update?.status === "ready"
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
@@ -251,28 +291,58 @@ export function Dashboard() {
               <div className="text-right">
                 <p className="aetherion-kicker">Instance</p>
                 <p className="mt-1 text-sm font-medium text-foreground">
-                  {CLIENT_PACK.name}
+                  {selectedVersion === CLIENT_PACK.minecraft ? CLIENT_PACK.name : `Minecraft ${selectedVersion}`}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {PACK_LABEL}
-                </p>
+                <label className="mt-1 block text-xs text-muted-foreground">
+                  <span className="sr-only">Minecraft version</span>
+                  <select
+                    aria-label="Minecraft version"
+                    value={selectedVersion}
+                    onChange={(event) => setMinecraftVersion(event.target.value)}
+                    className="max-w-[168px] bg-transparent text-right text-xs text-muted-foreground outline-none"
+                  >
+                    {versions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
 
-              <Button
-                size="lg"
-                onClick={handleLaunch}
-                disabled={progress !== null && progress.phase !== "error" && progress.phase !== "running"}
-                className={cn(
-                  "h-14 min-w-[168px] rounded-xl px-7 font-serif text-base tracking-[0.22em]",
-                  "bg-primary text-primary-foreground hover:bg-primary/92",
-                  "aetherion-gold-glow aetherion-sheen",
-                )}
-              >
-                <span className="inline-flex items-center gap-2.5">
-                  <Play className="size-4 fill-primary-foreground" />
-                  PLAY
-                </span>
-              </Button>
+              <div className="flex flex-col items-stretch">
+                <Button
+                  size="lg"
+                  onClick={updateMode ? handleUpdate : handleLaunch}
+                  disabled={
+                    updateMode
+                      ? update?.status !== "ready"
+                      : progress !== null && progress.phase !== "error" && progress.phase !== "running"
+                  }
+                  className={cn(
+                    "h-14 min-w-[168px] rounded-xl px-7 font-serif text-base tracking-[0.22em]",
+                    "bg-primary text-primary-foreground hover:bg-primary/92",
+                    "aetherion-gold-glow aetherion-sheen",
+                  )}
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <Play className="size-4 fill-primary-foreground" />
+                    {updateMode
+                      ? update?.status === "ready"
+                        ? "UPDATE"
+                        : `UPDATE ${update?.percent ?? 0}%`
+                      : "PLAY"}
+                  </span>
+                </Button>
+                {update?.status === "downloading" ? (
+                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full bg-primary transition-[width]"
+                      style={{ width: `${update.percent ?? 0}%` }}
+                    />
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
         </footer>

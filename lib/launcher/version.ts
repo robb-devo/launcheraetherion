@@ -4,4 +4,4 @@ import packageJson from "../../package.json"
 export const LAUNCHER_VERSION: string = packageJson.version
 
 /** Visual release label shown in settings. */
-export const LAUNCHER_BUILD_LABEL = "2026.09.22"
+export const LAUNCHER_BUILD_LABEL = "2026.09.23"

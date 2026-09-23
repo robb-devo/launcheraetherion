@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import type React from "react"
 import { Minus, Square, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { DISCORD_URL, WEBSITE_URL } from "@/lib/launcher/social"
 import { AetherionMark } from "./aetherion-mark"
 
 /**
@@ -68,6 +69,8 @@ export function WindowFrame({
             </span>
           </div>
           <div className="flex items-center gap-1">
+            <ExternalLink href={WEBSITE_URL}>Website</ExternalLink>
+            <ExternalLink href={DISCORD_URL}>Discord</ExternalLink>
             <WindowButton aria-label="Minimize" onClick={minimize}>
               <Minus className="size-3.5" />
             </WindowButton>
@@ -84,6 +87,26 @@ export function WindowFrame({
         <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
       </div>
     </div>
+  )
+}
+
+function ExternalLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+      className="mr-1 h-8 rounded-md px-2 text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80 transition hover:bg-white/6 hover:text-primary"
+      onClick={() => {
+        const open = window.aetherion?.shell?.openExternal
+        if (open) {
+          open(href).catch((err) => console.warn("[aetherion] failed to open link", err))
+          return
+        }
+        window.open(href, "_blank", "noopener,noreferrer")
+      }}
+    >
+      {children}
+    </button>
   )
 }
 

@@ -1,20 +1,20 @@
 # Publish the Windows launcher
 
-## Launcher 0.3.7 — Minecraft 1.21.1 Fabric
+## Launcher 0.3.8 — Minecraft 1.21.1 Fabric
 
 This build keeps the 0.3.4 window, dashboard, and settings. Play installs the Fabric pack (loader 0.19.5), Java 21, and connects to `play.donnernet.de:25565`. Microsoft sign-in is required to play. Your server talks to the control API. See `docs/SANDBOX_API.md` and `README.md`.
 
-Players install `Aetherion.Launcher.Setup.0.3.7.exe` once. That build checks GitHub Releases for `latest.yml` and installs newer versions inside the app. NSIS upgrades the same app id (`gg.aetherion.launcher`) and leaves the AppData folder in place. The taskbar id is the same app id, so the launcher is one button. The Microsoft window uses `skipTaskbar`.
+Players install `Aetherion.Launcher.Setup.0.3.8.exe` once. That build checks GitHub Releases for `latest.yml` and installs newer versions inside the app. NSIS upgrades the same app id (`gg.aetherion.launcher`) and leaves the AppData folder in place. The taskbar id is the same app id, so the launcher is one button. The Microsoft window uses `skipTaskbar`.
 
 ### Version
 
 | Where | Value |
 | --- | --- |
-| `package.json` `version` | `0.3.7` |
+| `package.json` `version` | `0.3.8` |
 | Electron `LAUNCHER_VERSION` | read from `package.json` in `electron/main.cjs` |
 | `/download` and settings | `lib/launcher/version.ts` imports `package.json` |
-| NSIS artifact | `Aetherion.Launcher.Setup.0.3.7.exe` |
-| GitHub tag | `v0.3.7` |
+| NSIS artifact | `Aetherion.Launcher.Setup.0.3.8.exe` |
+| GitHub tag | `v0.3.8` |
 | Release repo | `robb-devo/launcheraetherion` |
 
 The tag and `package.json` version must match.
@@ -27,15 +27,15 @@ The tag and `package.json` version must match.
 ```powershell
 git checkout main
 git pull
-git tag v0.3.7
-git push origin v0.3.7
+git tag v0.3.8
+git push origin v0.3.8
 ```
 
 3. Wait for `Build Windows Release`. It runs `pnpm build:win:ci` and uploads a published release:
 
 - `dist/latest.yml` (required; installed clients read this)
-- `dist/Aetherion.Launcher.Setup.0.3.7.exe` (one-time installer)
-- `dist/Aetherion.Launcher.Setup.0.3.7.exe.blockmap`
+- `dist/Aetherion.Launcher.Setup.0.3.8.exe` (one-time installer)
+- `dist/Aetherion.Launcher.Setup.0.3.8.exe.blockmap`
 
 4. Confirm the release is not a draft and that `latest.yml` is attached:
 

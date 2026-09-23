@@ -20,7 +20,9 @@ test("the bundled pack is Minecraft 1.21.1 Fabric", () => {
     port: 25565,
   })
   assert.equal(manifest.java.minMajor, 21)
-  const slugs = manifest.files.filter((file) => file.type === "required").map((file) => file.id)
+  const mods = manifest.files.filter((file) => file.path.startsWith("mods/"))
+  assert.equal(mods.every((file) => file.type === "optional" && file.defaultEnabled === true), true)
+  const slugs = mods.map((file) => file.id)
   assert.deepEqual(slugs, [
     "fabric-api",
     "sodium",

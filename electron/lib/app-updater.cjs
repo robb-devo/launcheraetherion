@@ -14,7 +14,8 @@ const FEED = {
 let state = {
   status: "idle",
   version: null,
-  message: "Install 0.3.7 once. Later versions arrive through this app.",
+  percent: 0,
+  message: "Install this version once. Later versions arrive through this app.",
 }
 let autoUpdater = null
 let started = false
@@ -57,7 +58,7 @@ function startAppUpdater() {
   }
 
   autoUpdater.autoDownload = true
-  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.autoInstallOnAppQuit = false
   autoUpdater.allowPrerelease = false
   autoUpdater.logger = console
   autoUpdater.setFeedURL(FEED)
@@ -69,6 +70,7 @@ function startAppUpdater() {
     publish({
       status: "available",
       version: info?.version || null,
+      percent: 0,
       message: info?.version ? `Downloading launcher ${info.version}...` : "Downloading the launcher update...",
     })
   })
@@ -77,7 +79,7 @@ function startAppUpdater() {
   })
   autoUpdater.on("download-progress", (progress) => {
     const percent = Math.max(0, Math.min(100, Math.round(progress?.percent || 0)))
-    publish({ status: "downloading", message: `Downloading update... ${percent}%` })
+    publish({ status: "downloading", percent, message: `Downloading update... ${percent}%` })
   })
   autoUpdater.on("update-downloaded", (info) => {
     const version = info?.version || state.version
@@ -118,6 +120,7 @@ function checkForUpdate() {
 
 function installUpdate() {
   if (!autoUpdater || state.status !== "ready") return { ok: false }
+  // Silent NSIS (/S) plus windowsHide inside electron-updater. No cmd or PowerShell window.
   setImmediate(() => {
     autoUpdater.quitAndInstall(true, true)
   })

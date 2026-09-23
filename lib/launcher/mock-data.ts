@@ -21,6 +21,7 @@ export const MOCK_DROPIN_MODS: DropinMod[] = []
 
 export const DEFAULT_SETTINGS: LauncherSettings = {
   minecraft: {
+    version: "1.21.1",
     resolution: { width: 1280, height: 720 },
     fullscreen: false,
     autoConnectServer: true,
@@ -58,10 +59,11 @@ export const MOCK_MOJANG_STATUS: MojangStatus = {
 export const REQUIRED_MODS: ManifestFile[] = CLIENT_PACK.mods.map((mod) => ({
   path: `mods/${mod.filename}`,
   url: mod.url,
-  sha256: "",
-  size: 0,
-  type: "required",
-  id: mod.slug,
+    sha256: "",
+    size: 0,
+    type: "optional",
+    defaultEnabled: true,
+    id: mod.slug,
   name: mod.slug,
   version: mod.filename,
 }))

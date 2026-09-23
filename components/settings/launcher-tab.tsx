@@ -166,7 +166,7 @@ export function LauncherTab() {
 
       <SettingsSection
         title="Updates"
-        description="Install 0.3.7 once. Later versions come from GitHub Releases inside this app."
+        description="Install this version once. Later versions come from GitHub Releases inside this app."
       >
         <p className="text-sm text-foreground">{update.message}</p>
         <div className="flex items-center gap-2">

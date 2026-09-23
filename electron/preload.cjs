@@ -63,7 +63,11 @@ contextBridge.exposeInMainWorld("aetherion", {
       return () => ipcRenderer.off("updater:state", listener)
     },
   },
+  minecraft: {
+    versions: () => ipcRenderer.invoke("minecraft:versions"),
+  },
   mods: {
+    listPack: () => ipcRenderer.invoke("mods:listPack"),
     listDropins: () => ipcRenderer.invoke("mods:listDropins"),
     addDropins: () => ipcRenderer.invoke("mods:addDropins"),
     setOptional: (path, enabled) => ipcRenderer.invoke("mods:setOptional", { path, enabled }),

@@ -197,6 +197,8 @@ export interface LauncherSettings {
 }
 
 export interface MinecraftSettings {
+  /** Selected client version. 1.21.1 is the Aetherion pack. */
+  version?: string
   resolution: { width: number; height: number }
   fullscreen: boolean
   autoConnectServer: boolean

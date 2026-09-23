@@ -5,7 +5,14 @@ export {}
 export type LauncherUpdateState = {
   status: "idle" | "checking" | "available" | "downloading" | "ready" | "none" | "error"
   version: string | null
+  percent?: number
   message: string
+}
+
+export type MinecraftVersionChoice = {
+  id: string
+  label: string
+  pack: boolean
 }
 
 declare global {
@@ -30,6 +37,7 @@ declare global {
           serverHost?: string
           serverPort?: number
           serverName?: string
+          minecraftVersion?: string
         }) => Promise<{
           ok: boolean
           target?: {
@@ -116,7 +124,16 @@ declare global {
         install: () => Promise<{ ok: boolean }>
         onState: (cb: (state: LauncherUpdateState) => void) => () => void
       }
+      minecraft: {
+        versions: () => Promise<{
+          current: string
+          versions: MinecraftVersionChoice[]
+        }>
+      }
       mods: {
+        listPack: () => Promise<
+          Array<{ path: string; name: string; version: string; enabled: boolean }>
+        >
         listDropins: () => Promise<import("@/lib/launcher/types").DropinMod[]>
         addDropins: () => Promise<import("@/lib/launcher/types").DropinMod[]>
         setOptional: (

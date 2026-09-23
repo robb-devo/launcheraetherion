@@ -11,6 +11,13 @@ const {
 } = require("./lib/pack-manifest.cjs")
 const { clientJarArtifact } = require("./lib/client-jar.cjs")
 const { assertSandboxJoin } = require("./lib/production-guard.cjs")
+const {
+  collectLibraries,
+  javaMajorForMinecraft,
+  loggingConfigArtifact,
+} = require("./lib/runtime-plan.cjs")
+const { resolveLaunchTarget, sanitizeVersion, versionChoices } = require("./lib/launch-target.cjs")
+const { emptyPlan, planManagedFiles, isKeptInstalledFile } = require("./lib/managed-mods.cjs")
 const { spawn } = require("node:child_process")
 const crypto = require("node:crypto")
 const fsSync = require("node:fs")
@@ -41,9 +48,10 @@ const DEFAULT_MANIFEST = {
 }
 const AETHERION_SERVER_HOST = "play.donnernet.de"
 const AETHERION_SERVER_PORT = 25565
-const AETHERION_SERVER_NAME = "AETHERION"
+const AETHERION_SERVER_NAME = "Aetherion"
 const DEFAULT_SETTINGS = {
   minecraft: {
+    version: "1.21.1",
     resolution: { width: 1280, height: 720 },
     fullscreen: false,
     autoConnectServer: true,
@@ -341,17 +349,51 @@ ipcMain.handle("settings:update", async (_event, patch) => {
 })
 ipcMain.handle("settings:getPaths", async () => {
   const settings = await readLauncherSettings()
+  const target = launchTargetFromSettings(settings)
   return {
     settingsPath: settingsPath(),
-    instancePath: settings.minecraft.gameDirectory,
+    instancePath: target.root,
+    packInstancePath: target.packRoot,
   }
 })
 ipcMain.handle("settings:openInstanceFolder", async () => {
   const settings = await readLauncherSettings()
-  await fs.mkdir(settings.minecraft.gameDirectory, { recursive: true })
-  const error = await shell.openPath(settings.minecraft.gameDirectory)
+  const target = launchTargetFromSettings(settings)
+  await fs.mkdir(target.root, { recursive: true })
+  const error = await shell.openPath(target.root)
   if (error) throw new Error(error)
   return { ok: true }
+})
+ipcMain.handle("minecraft:versions", async () => {
+  const settings = await readLauncherSettings()
+  let releases = []
+  try {
+    const cachePath = path.join(app.getPath("userData"), "mojang-version-cache.json")
+    let manifest = null
+    try {
+      const cached = JSON.parse(await fs.readFile(cachePath, "utf8"))
+      if (Date.now() - Number(cached.fetchedAt) < 6 * 60 * 60 * 1000 && cached.manifest) {
+        manifest = cached.manifest
+      }
+    } catch {
+      manifest = null
+    }
+    if (!manifest) {
+      manifest = await fetchJson(MOJANG_VERSION_MANIFEST)
+      await fs.mkdir(path.dirname(cachePath), { recursive: true })
+      await fs.writeFile(cachePath, JSON.stringify({ fetchedAt: Date.now(), manifest }))
+    }
+    releases = (manifest.versions || [])
+      .filter((version) => version.type === "release")
+      .slice(0, 30)
+      .map((version) => version.id)
+  } catch (error) {
+    console.warn("[aetherion] could not refresh Minecraft versions", error)
+  }
+  return {
+    current: settings.minecraft.version,
+    versions: versionChoices(releases),
+  }
 })
 ipcMain.handle("java:detect", async () => {
   const settings = await readLauncherSettings()
@@ -389,6 +431,23 @@ ipcMain.handle("java:chooseExecutable", async () => {
   return { settings: next, java }
 })
 
+ipcMain.handle("mods:listPack", async () => {
+  const settings = await readLauncherSettings()
+  const manifest = await loadManifest(settings, undefined)
+  const root = settings.minecraft.gameDirectory || instancePath(manifest.instanceId || "aetherion-client")
+  const state = await readInstanceState(root, manifest, manifest.instanceId || "aetherion-client")
+  return (manifest.files || [])
+    .filter((file) => String(file.path || "").startsWith("mods/") && String(file.path).endsWith(".jar"))
+    .map((file) => ({
+      path: file.path,
+      name: file.name || path.basename(file.path),
+      version: file.version || "",
+      enabled:
+        state.enabledOptionalMods?.[file.path] !== undefined
+          ? Boolean(state.enabledOptionalMods[file.path])
+          : file.defaultEnabled !== false,
+    }))
+})
 ipcMain.handle("mods:listDropins", async () => {
   const root = await currentInstanceRoot()
   return refreshDropinState(root)
@@ -724,6 +783,7 @@ function sanitizeLauncherSettings(value) {
 
   return {
     minecraft: {
+      version: sanitizeVersion(minecraft.version) || "1.21.1",
       resolution: { width, height },
       fullscreen: Boolean(minecraft.fullscreen),
       autoConnectServer:
@@ -813,8 +873,14 @@ async function runUpdater(args, signal) {
   const manifest = await loadManifest(settings, signal)
   validateManifest(manifest)
 
-  const instanceId = manifest.instanceId || launchArgs.instanceId || "aetherion-main"
-  const root = settings.minecraft.gameDirectory || instancePath(instanceId)
+  const instanceId = manifest.instanceId || launchArgs.instanceId || "aetherion-client"
+  const target = resolveLaunchTarget({
+    requestedVersion: launchArgs.minecraftVersion || settings.minecraft.version,
+    packVersion: manifest.minecraft,
+    packInstanceId: instanceId,
+    gameDirectory: settings.minecraft.gameDirectory || instancePath(instanceId),
+  })
+  const root = target.root
   await fs.mkdir(root, { recursive: true })
 
   emitLaunchProgress({
@@ -832,12 +898,16 @@ async function runUpdater(args, signal) {
   }
   throwIfAborted(signal)
 
-  const plan = computeUpdatePlan(manifest, localState, installedHashes)
+  const plan = target.usePack
+    ? computeUpdatePlan(manifest, localState, installedHashes)
+    : emptyPlan(manifest.version, localState.installedManifestVersion)
 
   if (plan.downloadCount === 0 && plan.removeCount === 0) {
     emitLaunchProgress({
       phase: "verifying",
-      message: `Up to date: Minecraft ${manifest.minecraft} + Fabric ${manifest.loader.version}`,
+      message: target.usePack
+        ? `Up to date: Minecraft ${manifest.minecraft} + Fabric ${manifest.loader.version}`
+        : `Up to date: Minecraft ${target.version}`,
       totalBytes: 0,
       loadedBytes: 0,
       filesDone: 0,
@@ -847,12 +917,14 @@ async function runUpdater(args, signal) {
     await executeUpdatePlan(root, plan, signal)
   }
 
-  await ensureFabricProfile(root, manifest, signal)
-  await applyIrisDefaults(root, manifest)
+  if (target.usePack) {
+    await ensureFabricProfile(root, manifest, signal)
+    await applyIrisDefaults(root, manifest)
+  }
   const installedForgeSha = localState.installedForgeSha || null
 
   const nextState = {
-    instanceId,
+    instanceId: target.usePack ? instanceId : `mc-${target.version}`,
     installedManifestVersion: manifest.version,
     enabledOptionalMods: localState.enabledOptionalMods || {},
     dropinMods: localState.dropinMods || [],
@@ -861,14 +933,21 @@ async function runUpdater(args, signal) {
   }
   await writeInstanceState(root, nextState)
 
-  const launchPlan = await buildMinecraftLaunchPlan(root, manifest, launchArgs, signal)
+  const planArgs = {
+    ...launchArgs,
+    minecraftVersion: target.version,
+    usePack: target.usePack,
+    autoConnectServer: target.autoJoinRealm ? launchArgs.autoConnectServer : false,
+  }
+  const launchPlan = await buildMinecraftLaunchPlan(root, manifest, planArgs, signal)
   if (!launchPlan.ready) {
     await prepareMinecraftRuntime(root, launchPlan, signal)
   }
-  const finalLaunchPlan = await buildMinecraftLaunchPlan(root, manifest, launchArgs, signal)
+  const finalLaunchPlan = await buildMinecraftLaunchPlan(root, manifest, planArgs, signal)
   if (!finalLaunchPlan.ready) {
+    const listed = finalLaunchPlan.missing.slice(0, 5).join(", ")
     throw new Error(
-      `Still missing ${finalLaunchPlan.missing.length} file(s) before launch. First missing: ${finalLaunchPlan.missing[0]}`,
+      `Still missing ${finalLaunchPlan.missing.length} file(s) before launch. First missing: ${finalLaunchPlan.missing[0]}. ${listed}`,
     )
   }
   const processInfo = await startMinecraft(finalLaunchPlan, signal)
@@ -887,8 +966,8 @@ async function runUpdater(args, signal) {
   }
 
   return {
-    minecraft: manifest.minecraft,
-    loader: manifest.loader.version,
+    minecraft: target.version,
+    loader: target.usePack ? manifest.loader.version : null,
     launchPlan: summarizeLaunchPlan(finalLaunchPlan),
     process: processInfo,
   }
@@ -902,6 +981,7 @@ function normalizeLaunchArgs(args, settings) {
     fullscreen: Boolean(minecraft.fullscreen),
     width: minecraft.resolution.width,
     height: minecraft.resolution.height,
+    minecraftVersion: sanitizeVersion(args?.minecraftVersion) || minecraft.version || "1.21.1",
     autoConnectServer: directServer ? false : Boolean(minecraft.autoConnectServer),
     detachProcess: Boolean(minecraft.detachProcess),
     closeOnLaunch: Boolean(minecraft.closeOnLaunch),
@@ -915,13 +995,36 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
     message: "Building the Minecraft launch plan...",
   })
 
-  const profileId = fabricProfileId(manifest)
+  const usePack = args?.usePack !== false && (args?.minecraftVersion || manifest.minecraft) === manifest.minecraft
+  const versionId = usePack ? manifest.minecraft : args?.minecraftVersion || manifest.minecraft
   const realm = packServer(manifest)
-  const forgeProfilePath = path.join(root, "versions", profileId, `${profileId}.json`)
-  const forgeProfile = await readJsonFile(forgeProfilePath)
-  const parentId = forgeProfile.inheritsFrom || manifest.minecraft
-  const parentProfile = await ensureMinecraftVersionJson(root, parentId, signal)
-  const merged = mergeVersionProfiles(parentProfile, forgeProfile)
+  let profileId
+  let childProfile
+  let parentId
+  let parentProfile
+  if (usePack) {
+    profileId = fabricProfileId(manifest)
+    const profilePath = path.join(root, "versions", profileId, `${profileId}.json`)
+    childProfile = await readJsonFile(profilePath)
+    parentId = childProfile.inheritsFrom || versionId
+    parentProfile = await ensureMinecraftVersionJson(root, parentId, signal)
+  } else {
+    profileId = versionId
+    parentId = versionId
+    parentProfile = await ensureMinecraftVersionJson(root, versionId, signal)
+    childProfile = parentProfile
+  }
+  const merged = usePack
+    ? mergeVersionProfiles(parentProfile, childProfile)
+    : {
+        mainClass: parentProfile.mainClass,
+        type: parentProfile.type,
+        libraries: parentProfile.libraries || [],
+        arguments: {
+          jvm: normalizeArguments(parentProfile.arguments?.jvm),
+          game: normalizeArguments(parentProfile.arguments?.game || parentProfile.minecraftArguments),
+        },
+      }
   if (!merged.mainClass) {
     throw new Error(`Profile ${profileId} does not include a mainClass, so Minecraft cannot start.`)
   }
@@ -939,15 +1042,13 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
     }
     await writeAccountsState(next)
   }
-  const java = await resolveJavaForSettings(
-    args?.java,
-    manifest.java?.minMajor || 21,
-    manifest.java?.recommendedMajor || manifest.java?.minMajor || 21,
-    true,
-  )
+  const javaMajor = usePack
+    ? manifest.java?.recommendedMajor || manifest.java?.minMajor || 21
+    : javaMajorForMinecraft(versionId)
+  const java = await resolveJavaForSettings(args?.java, javaMajor, javaMajor, true)
 
   if (!java) {
-    throw new Error("Java 21 was not found. Install Eclipse Temurin 21 or set JAVA_HOME.")
+    throw new Error(`Java ${javaMajor} was not found. Install Eclipse Temurin ${javaMajor} or set JAVA_HOME.`)
   }
 
   const libraryDirectory = path.join(root, "libraries")
@@ -956,7 +1057,7 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
   const clientArtifact = clientJarArtifact(root, parentId, parentProfile)
   const clientJar = clientArtifact.path
   const libraryPlan = collectLibraries(root, merged.libraries)
-  const includeVanillaClientJar = !isForgeProfile(forgeProfile)
+  const includeVanillaClientJar = !isForgeProfile(childProfile)
   const clientReady = includeVanillaClientJar
     ? await fileMatchesHash(clientJar, clientArtifact.sha1, "sha1")
     : true
@@ -964,6 +1065,7 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
     ? [...libraryPlan.classpath, clientJar]
     : libraryPlan.classpath
   const assetPlan = await collectAssetPlan(root, parentProfile.assetIndex)
+  const logging = loggingConfigArtifact(root, parentProfile)
   const variables = {
     auth_player_name: session.name,
     version_name: profileId,
@@ -977,8 +1079,9 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
     clientid: "",
     auth_xuid: session.xuid || "",
     user_type: session.userType,
-    version_type: forgeProfile.type || parentProfile.type || "release",
+    version_type: childProfile.type || parentProfile.type || "release",
     natives_directory: nativesDirectory,
+    path: logging?.path || "",
     launcher_name: LAUNCHER_NAME,
     launcher_version: LAUNCHER_VERSION,
     library_directory: libraryDirectory,
@@ -995,6 +1098,7 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
   ]
   const jvmArgs = [
     ...memoryArgs,
+    ...(logging ? [`-Dlog4j.configurationFile=${logging.path}`] : []),
     ...resolveArguments(merged.arguments.jvm, variables),
   ].filter(Boolean)
   const gameArgs = resolveArguments(merged.arguments.game, variables, {
@@ -1028,6 +1132,7 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
     ...libraryPlan.missing,
     ...libraryPlan.missingNatives,
     ...(includeVanillaClientJar && !clientReady ? [clientArtifact.relativePath] : []),
+    ...(logging && !fsSync.existsSync(logging.path) ? [logging.relativePath] : []),
     ...assetPlan.missing,
   ]
 
@@ -1042,6 +1147,7 @@ async function buildMinecraftLaunchPlan(root, manifest, args, signal) {
     classpathEntries,
     includeVanillaClientJar,
     clientJar: includeVanillaClientJar ? clientArtifact : null,
+    logging,
     libraryArtifacts: libraryPlan.artifacts,
     nativeArtifacts: libraryPlan.nativeArtifacts,
     nativesDirectory,
@@ -1121,7 +1227,8 @@ async function startMinecraft(launchPlan, signal) {
     logPath,
   })
 
-  const child = spawn(launchPlan.javaPath, launchPlan.commandArgs, {
+  const commandArgs = await windowsLaunchArgs(launchPlan)
+  const child = spawn(launchPlan.javaPath, commandArgs, {
     cwd: launchPlan.root,
     detached: launchPlan.detachProcess,
     windowsHide: true,
@@ -1567,12 +1674,15 @@ function writeUInt16(value) {
 }
 
 async function prepareMinecraftRuntime(root, launchPlan, signal) {
+  const prelude = []
   if (launchPlan.clientJar && !(await fileMatchesHash(launchPlan.clientJar.path, launchPlan.clientJar.sha1, "sha1"))) {
-    await downloadRuntimeArtifacts(
-      [launchPlan.clientJar],
-      signal,
-      `Downloading Minecraft ${launchPlan.parentId}`,
-    )
+    prelude.push(launchPlan.clientJar)
+  }
+  if (launchPlan.logging && !(await fileMatchesHash(launchPlan.logging.path, launchPlan.logging.sha1, "sha1"))) {
+    prelude.push(launchPlan.logging)
+  }
+  if (prelude.length) {
+    await downloadRuntimeArtifacts(prelude, signal, `Downloading Minecraft ${launchPlan.parentId}`)
   }
 
   const artifacts = uniqueArtifacts([
@@ -1616,6 +1726,10 @@ async function prepareMinecraftRuntime(root, launchPlan, signal) {
 
   await downloadRuntimeArtifacts(assetDownloads, signal, "Downloading Minecraft assets")
   await ensureNativesExtracted(launchPlan, signal)
+  if (!launchPlan.nativeArtifacts.length) {
+    await fs.rm(launchPlan.nativesDirectory, { recursive: true, force: true })
+    await fs.mkdir(launchPlan.nativesDirectory, { recursive: true })
+  }
 }
 
 async function downloadRuntimeArtifacts(artifacts, signal, label) {
@@ -1823,7 +1937,14 @@ async function getLaunchAccount(accountId) {
 
 async function ensureMinecraftVersionJson(root, versionId, signal) {
   const versionPath = path.join(root, "versions", versionId, `${versionId}.json`)
-  if (fsSync.existsSync(versionPath)) return readJsonFile(versionPath)
+  if (fsSync.existsSync(versionPath)) {
+    try {
+      const cached = await readJsonFile(versionPath)
+      if (cached?.downloads?.client?.url && cached?.downloads?.client?.sha1) return cached
+    } catch (error) {
+      console.warn("[aetherion] replacing unreadable version json", error)
+    }
+  }
 
   emitLaunchProgress({
     phase: "fetching-manifest",
@@ -1837,6 +1958,9 @@ async function ensureMinecraftVersionJson(root, versionId, signal) {
   }
 
   const profile = await fetchJson(version.url, signal)
+  if (!profile?.downloads?.client?.url) {
+    throw new Error(`Minecraft ${versionId} is missing the vanilla client jar in the version JSON.`)
+  }
   await fs.mkdir(path.dirname(versionPath), { recursive: true })
   await fs.writeFile(versionPath, `${JSON.stringify(profile, null, 2)}\n`, "utf8")
   return profile
@@ -1890,45 +2014,6 @@ function normalizeArguments(value) {
   return []
 }
 
-function collectLibraries(root, libraries) {
-  const artifacts = []
-  const classpath = []
-  const nativeArtifacts = []
-  const missing = []
-  const missingNatives = []
-
-  for (const library of libraries || []) {
-    if (!isAllowedByRules(library.rules)) continue
-
-    const artifact = libraryArtifactFromDownload(root, library, library.downloads?.artifact)
-    if (artifact) {
-      if (isNativeLibrary(library, artifact.relativePath)) {
-        nativeArtifacts.push(artifact)
-        if (!fsSync.existsSync(artifact.path)) missingNatives.push(artifact.relativePath)
-      } else {
-        artifacts.push(artifact)
-        classpath.push(artifact.path)
-        if (!fsSync.existsSync(artifact.path)) missing.push(artifact.relativePath)
-      }
-    }
-
-    const nativeClassifier = nativeClassifierFor(library)
-    const native = nativeClassifier ? library.downloads?.classifiers?.[nativeClassifier] : null
-    if (native) {
-      const nativeArtifact = libraryArtifactFromDownload(root, library, native)
-      if (nativeArtifact) {
-        nativeArtifacts.push({
-          ...nativeArtifact,
-          exclude: library.extract?.exclude || [],
-        })
-        if (!fsSync.existsSync(nativeArtifact.path)) missingNatives.push(nativeArtifact.relativePath)
-      }
-    }
-  }
-
-  return { artifacts, classpath, nativeArtifacts, missing, missingNatives }
-}
-
 async function collectAssetPlan(root, assetIndex) {
   if (!assetIndex?.id || !assetIndex?.url) {
     return { objects: [], missing: [], missingObjects: 0 }
@@ -1954,35 +2039,6 @@ async function collectAssetPlan(root, assetIndex) {
   }
 
   return { objects, missing, missingObjects: missing.length }
-}
-
-function libraryArtifactFromDownload(root, library, download) {
-  const artifactPath = download?.path || mavenPathFromName(library.name)
-  if (!artifactPath) return null
-
-  const url = download?.url || libraryUrlFor(library, artifactPath)
-  const absolute = path.join(root, "libraries", ...artifactPath.split("/"))
-  return {
-    path: absolute,
-    relativePath: toPosix(path.relative(root, absolute)),
-    url,
-    sha1: download?.sha1 || null,
-    size: download?.size || 0,
-    label: library.name || artifactPath,
-  }
-}
-
-function libraryUrlFor(library, artifactPath) {
-  const base = library.url || "https://libraries.minecraft.net/"
-  return `${String(base).replace(/\/?$/, "/")}${artifactPath}`
-}
-
-function isNativeLibrary(library, artifactPath) {
-  return (
-    Boolean(library.natives) ||
-    /(^|-)natives-/.test(library.name || "") ||
-    /(^|-)natives-/.test(artifactPath || "")
-  )
 }
 
 function assetObjectArtifact(root, name, object) {
@@ -2041,13 +2097,6 @@ function applyVariables(value, variables) {
   })
 }
 
-function nativeClassifierFor(library) {
-  const osName = getMinecraftOsName()
-  const classifier = library.natives?.[osName]
-  if (!classifier) return null
-  return classifier.replace("${arch}", process.arch === "x64" ? "64" : "32")
-}
-
 function isAllowedByRules(rules, options = {}) {
   if (!Array.isArray(rules) || rules.length === 0) return true
 
@@ -2077,16 +2126,6 @@ function getMinecraftOsName() {
   if (process.platform === "win32") return "windows"
   if (process.platform === "darwin") return "osx"
   return "linux"
-}
-
-function mavenPathFromName(name) {
-  if (!name || typeof name !== "string") return null
-  const [group, artifact, version, classifierPart] = name.split(":")
-  if (!group || !artifact || !version) return null
-
-  const classifier = classifierPart ? `-${classifierPart.replace(/^@/, "")}` : ""
-  const extension = classifierPart?.startsWith("@") ? classifierPart.slice(1) : "jar"
-  return `${group.replace(/\./g, "/")}/${artifact}/${version}/${artifact}-${version}${classifier}.${extension}`
 }
 
 async function ensureFabricProfile(root, manifest, signal) {
@@ -2283,51 +2322,15 @@ async function scanDropinMods(root, knownMods = []) {
 }
 
 function computeUpdatePlan(manifest, local, installedHashes) {
-  const actions = []
   const needsForgeInstall = false
-
-  const validPaths = new Set()
-  for (const file of manifest.files) {
-    validPaths.add(file.path)
-
-    if (file.type === "optional") {
-      const enabled =
-        local.enabledOptionalMods?.[file.path] !== undefined
-          ? local.enabledOptionalMods[file.path]
-          : file.defaultEnabled ?? false
-      if (!enabled) {
-        if (installedHashes[file.path]) {
-          actions.push({ kind: "remove", path: file.path, reason: "optional-disabled" })
-        }
-        continue
-      }
-    }
-
-    const installed = installedHashes[file.path]
-    const expected = String(file.sha256 || "")
-    if (installed && (!expected || installed.toLowerCase() === expected.toLowerCase())) {
-      actions.push({ kind: "skip", path: file.path, reason: "hash-match" })
-    } else {
-      actions.push({
-        kind: "download",
-        path: file.path,
-        url: file.url,
-        sha256: expected,
-        size: file.size || 0,
-        category: file.type,
-      })
-    }
-  }
+  const managed = planManagedFiles(manifest.files, local, installedHashes)
+  const actions = [...managed.actions]
+  const validPaths = managed.validPaths
 
   const protectedPatterns = manifest.protectedPatterns || []
   const dropinSet = new Set((local.dropinMods || []).map((mod) => `mods/${mod.filename}`))
   for (const filePath of Object.keys(installedHashes)) {
-    if (validPaths.has(filePath)) continue
-    if (filePath.startsWith("forge/")) continue
-    if (filePath.startsWith("mods/dropin/")) continue
-    if (filePath.startsWith("shaderpacks/")) continue
-    if (dropinSet.has(filePath)) continue
-    if (isProtected(filePath, protectedPatterns)) continue
+    if (isKeptInstalledFile(filePath, validPaths, protectedPatterns, dropinSet, isProtected)) continue
     actions.push({ kind: "remove", path: filePath, reason: "orphan" })
   }
 
@@ -2344,6 +2347,14 @@ function computeUpdatePlan(manifest, local, installedHashes) {
 }
 
 async function executeUpdatePlan(root, plan, signal) {
+  for (const action of plan.actions) {
+    if (action.kind === "disable") {
+      await moveInstanceFile(root, action.path, `${action.path}.disabled`)
+    } else if (action.kind === "enable") {
+      await moveInstanceFile(root, `${action.path}.disabled`, action.path)
+    }
+  }
+
   const downloads = plan.actions.filter((action) => action.kind === "download")
   const removals = plan.actions.filter((action) => action.kind === "remove")
   let loadedBytes = 0
@@ -2961,6 +2972,42 @@ function instancePath(instanceId) {
 
 function instanceStatePath(root) {
   return path.join(root, "instance-state.json")
+}
+
+async function moveInstanceFile(root, fromRelative, toRelative) {
+  const from = safeResolve(root, fromRelative)
+  const to = safeResolve(root, toRelative)
+  if (!fsSync.existsSync(from)) return
+  await fs.mkdir(path.dirname(to), { recursive: true })
+  await fs.rm(to, { force: true }).catch(() => undefined)
+  await fs.rename(from, to)
+}
+
+async function windowsLaunchArgs(launchPlan) {
+  const args = launchPlan.commandArgs
+  const estimated = args.reduce((total, arg) => total + String(arg).length + 1, String(launchPlan.javaPath || "").length)
+  if (process.platform !== "win32" || estimated < 7000) return args
+  const filePath = path.join(launchPlan.root, "logs", "launch.argfile")
+  await fs.mkdir(path.dirname(filePath), { recursive: true })
+  const body = `${args.map(quoteJavaArg).join("\n")}\n`
+  await fs.writeFile(filePath, body, "utf8")
+  return [`@${filePath}`]
+}
+
+function quoteJavaArg(arg) {
+  const text = String(arg)
+  if (!/[\s"#]/.test(text)) return text
+  return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
+}
+
+function launchTargetFromSettings(settings, requestedVersion) {
+  const instanceId = "aetherion-client"
+  return resolveLaunchTarget({
+    requestedVersion: requestedVersion || settings?.minecraft?.version,
+    packVersion: "1.21.1",
+    packInstanceId: instanceId,
+    gameDirectory: settings?.minecraft?.gameDirectory || instancePath(instanceId),
+  })
 }
 
 function safeResolve(root, relativePath) {

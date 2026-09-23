@@ -45,15 +45,17 @@ function normalizePackManifest(raw) {
 
 function fileFromPackEntry(entry, folder, type) {
   const filename = String(entry?.filename || "").trim()
+  const presetMod = folder === "mods"
   return {
     path: `${folder}/${filename}`,
     url: String(entry?.url || ""),
     sha256: "",
     size: 0,
-    type,
+    type: presetMod ? "optional" : type,
     id: entry?.slug || filename,
     name: entry?.slug || filename,
     version: filename,
+    defaultEnabled: presetMod ? true : undefined,
   }
 }
 
